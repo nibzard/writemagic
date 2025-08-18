@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WriteMagic</string>
+    <string name="writing_tab">Writing</string>
+    <string name="projects_tab">Projects</string>
+    <string name="ai_tab">AI Assistant</string>
+    <string name="timeline_tab">Timeline</string>
+    <string name="settings_tab">Settings</string>
+</resources>

@@ -1,0 +1,172 @@
+repos:
+  # Rust formatting and linting
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        name: Rust format
+        description: Format Rust code with rustfmt
+        entry: cargo fmt
+        language: system
+        types: [rust]
+        args: ["--all", "--", "--check"]
+        pass_filenames: false
+      
+      - id: clippy
+        name: Rust clippy
+        description: Lint Rust code with clippy
+        entry: cargo clippy
+        language: system
+        types: [rust]
+        args: ["--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
+        pass_filenames: false
+      
+      - id: cargo-check
+        name: Rust cargo check
+        description: Check Rust code with cargo check
+        entry: cargo check
+        language: system
+        types: [rust]
+        args: ["--workspace", "--all-targets", "--all-features"]
+        pass_filenames: false
+
+  # Conventional commits validation
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [
+          "--types", "feat,fix,docs,style,refactor,test,chore,perf,ci",
+          "--scopes", "mobile,core,ai,ux,infra,docs,agents",
+          "--optional-scopes"
+        ]
+
+  # General code quality
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.patch$
+      - id: end-of-file-fixer
+        exclude: \.patch$
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+
+  # Secret scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package.lock.json
+
+  # Android Kotlin formatting
+  - repo: https://github.com/JLLeitschuh/ktlint
+    rev: v11.6.1
+    hooks:
+      - id: ktlint
+        files: \.kt$|\.kts$
+        args: [
+          "--format",
+          "--code-style=android_studio"
+        ]
+
+  # iOS Swift formatting
+  - repo: https://github.com/nicklockwood/SwiftFormat
+    rev: 0.52.11
+    hooks:
+      - id: swiftformat
+        files: \.swift$
+        args: [
+          "--config", "ios/.swiftformat",
+          "--swiftversion", "5.9"
+        ]
+
+  # iOS Swift linting
+  - repo: https://github.com/realm/SwiftLint
+    rev: 0.54.0
+    hooks:
+      - id: swiftlint
+        files: \.swift$
+        args: [
+          "--config", "ios/.swiftlint.yml",
+          "--strict"
+        ]
+
+  # License header enforcement
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.4
+    hooks:
+      - id: insert-license
+        files: \.rs$
+        args:
+          - --license-filepath
+          - LICENSE-HEADER.txt
+          - --comment-style
+          - //
+      - id: insert-license
+        files: \.swift$
+        args:
+          - --license-filepath
+          - LICENSE-HEADER.txt
+          - --comment-style
+          - //
+      - id: insert-license
+        files: \.kt$|\.kts$
+        args:
+          - --license-filepath
+          - LICENSE-HEADER.txt
+          - --comment-style
+          - //
+
+  # Markdown formatting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.37.0
+    hooks:
+      - id: markdownlint
+        args: [
+          "--config", ".markdownlint.json",
+          "--fix"
+        ]
+
+  # Docker linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: ["--ignore", "DL3008", "--ignore", "DL3009"]
+
+  # GitHub Actions workflow validation
+  - repo: https://github.com/rhymu8354/pre-commit-actionlint
+    rev: main
+    hooks:
+      - id: actionlint
+
+# Default language version for hooks
+default_language_version:
+  python: python3.11
+  node: 18.17.1
+
+# Configuration for specific hooks
+ci:
+  autofix_commit_msg: |
+    style: auto fixes from pre-commit hooks
+
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+
+    Co-Authored-By: Claude <noreply@anthropic.com>
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: 'chore(deps): pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

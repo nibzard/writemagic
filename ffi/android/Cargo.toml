@@ -1,0 +1,41 @@
+[package]
+name = "writemagic-android-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+# Core dependencies
+writemagic-shared = { path = "../../core/shared" }
+writemagic-writing = { path = "../../core/writing" }
+writemagic-ai = { path = "../../core/ai" }
+writemagic-project = { path = "../../core/project" }
+writemagic-version-control = { path = "../../core/version_control" }
+writemagic-agent = { path = "../../core/agent" }
+
+# Android FFI
+jni.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Logging
+log.workspace = true
+android_logger = "0.13"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.13"

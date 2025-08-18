@@ -1,0 +1,158 @@
+# SwiftLint configuration for WriteMagic iOS
+# https://github.com/realm/SwiftLint
+
+disabled_rules: # rule identifiers to exclude from running
+  - trailing_whitespace
+  - orphaned_doc_comment
+
+opt_in_rules: # some rules are only opt-in
+  - empty_count
+  - empty_string
+  - explicit_init
+  - first_where
+  - force_unwrapping
+  - implicit_return
+  - joined_default_parameter
+  - literal_expression_end_indentation
+  - multiline_arguments
+  - multiline_function_chains
+  - multiline_literal_brackets
+  - multiline_parameters
+  - multiline_parameters_brackets
+  - operator_usage_whitespace
+  - overridden_super_call
+  - prohibited_super_call
+  - redundant_nil_coalescing
+  - single_test_class
+  - sorted_first_last
+  - switch_case_on_newline
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+# Paths to include during linting. `--path` is ignored if present
+included:
+  - WriteMagic
+
+# Paths to ignore during linting. Takes precedence over `included`
+excluded:
+  - Carthage
+  - Pods
+  - WriteMagic.xcodeproj
+  - build
+
+# Configurable rules can be customized from this configuration file
+# Binary rules can set their severity level
+force_cast: warning # implicitly
+force_try:
+  severity: warning # explicitly
+
+# Rules that have both warning and error levels, can set just the warning level
+# implicitly
+line_length: 120
+
+# They can set both implicitly with an array
+type_body_length:
+  - 300 # warning
+  - 400 # error
+
+# Or they can set both explicitly
+file_length:
+  warning: 500
+  error: 1200
+
+# Naming rules can set warnings/errors for min_length and max_length
+# additionally they can set excluded names
+type_name:
+  min_length: 4 # only warning
+  max_length: # warning and error
+    warning: 40
+    error: 50
+  excluded: iPhone # excluded via string
+  allowed_symbols: ["_"] # these are allowed in type names
+
+identifier_name:
+  min_length: # only min_length
+    error: 4 # only error
+  excluded: # excluded via string array
+    - id
+    - URL
+    - GlobalAPIKey
+
+# Function rules
+function_body_length:
+  warning: 50
+  error: 100
+
+function_parameter_count:
+  warning: 6
+  error: 8
+
+# Closure rules
+closure_body_length:
+  warning: 30
+  error: 50
+
+# Custom rules
+custom_rules:
+  rule_id:
+    included: ".*\\.swift"
+    excluded: ".*Test\\.swift"
+    name: "Rule ID"
+    regex: "id"
+    capture_group: 0
+    message: "some message"
+    severity: warning
+
+  no_objcMembers:
+    name: "No @objcMembers"
+    regex: "@objcMembers"
+    message: "Explicitly use @objc on each member you want to expose to Objective-C"
+    severity: error
+
+  no_direct_standard_out_logs:
+    name: "No Direct Standard Out Logs"
+    regex: "(\\bprint|\\bdebugPrint|\\bdump|Swift\\.print|Swift\\.debugPrint|Swift\\.dump)\\s*\\("
+    message: "Don't commit `print(…)`, `debugPrint(…)`, or `dump(…)` as they bloat the console. If logging is required, use a logger."
+    severity: warning
+
+# Configuration for specific rules
+vertical_whitespace:
+  max_empty_lines: 2
+
+trailing_newline:
+  severity: error
+
+opening_brace:
+  severity: error
+
+comma:
+  severity: error
+
+colon:
+  severity: error
+
+legacy_constructor:
+  severity: error
+
+legacy_constant:
+  severity: error
+
+statement_position:
+  severity: error
+
+todo:
+  severity: warning
+
+# Multiline configuration
+multiline_arguments:
+  first_argument_location: next_line
+  only_enforce_after_first_closure_on_first_line: true
+
+multiline_parameters:
+  allows_single_line: true
+
+# Analyzer rules (require `--analyze`)
+analyzer_rules:
+  - explicit_self
+  - unused_import

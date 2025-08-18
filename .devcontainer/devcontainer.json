@@ -1,0 +1,177 @@
+{
+  "name": "WriteMagic Development Environment",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  
+  // Configure tool-specific properties
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // Rust extensions
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "serayuzgur.crates",
+        "dustypomerleau.rust-syntax",
+        
+        // Mobile development
+        "ms-vscode.vscode-kotlin",
+        "mathiasfrohlich.kotlin",
+        "sswg.swift-lang",
+        
+        // Android development
+        "vscjava.vscode-gradle",
+        "redhat.java",
+        
+        // Git and version control
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        "donjayamanne.githistory",
+        
+        // Code quality
+        "streetsidesoftware.code-spell-checker",
+        "ms-vscode.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        
+        // Docker and containers
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-containers",
+        
+        // GitHub integration
+        "github.vscode-pull-request-github",
+        "github.copilot",
+        "github.copilot-chat",
+        
+        // YAML and configuration
+        "redhat.vscode-yaml",
+        "ms-vscode.vscode-json",
+        "tamasfe.even-better-toml",
+        
+        // Markdown
+        "yzhang.markdown-all-in-one",
+        "davidanson.vscode-markdownlint"
+      ],
+      
+      "settings": {
+        // Rust settings
+        "rust-analyzer.cargo.allFeatures": true,
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "rust-analyzer.checkOnSave.allTargets": true,
+        "rust-analyzer.cargo.buildScripts.enable": true,
+        "rust-analyzer.procMacro.enable": true,
+        
+        // Editor settings
+        "editor.formatOnSave": true,
+        "editor.formatOnPaste": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll": true,
+          "source.organizeImports": true
+        },
+        
+        // File associations
+        "files.associations": {
+          "*.rs": "rust",
+          "*.kt": "kotlin",
+          "*.kts": "kotlin",
+          "*.swift": "swift",
+          "Cargo.toml": "toml",
+          "Cargo.lock": "toml"
+        },
+        
+        // Terminal settings
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.cwd": "/workspace",
+        
+        // Git settings
+        "git.enableSmartCommit": true,
+        "git.confirmSync": false,
+        "git.autofetch": true,
+        
+        // Search exclusions
+        "search.exclude": {
+          "**/target": true,
+          "**/node_modules": true,
+          "**/.git": true,
+          "**/build": true,
+          "**/dist": true
+        },
+        
+        // File watcher exclusions
+        "files.watcherExclude": {
+          "**/target/**": true,
+          "**/node_modules/**": true,
+          "**/.git/objects/**": true,
+          "**/build/**": true,
+          "**/dist/**": true
+        }
+      }
+    }
+  },
+  
+  // Container configuration
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
+  ],
+  
+  // Environment variables
+  "containerEnv": {
+    "RUST_LOG": "debug",
+    "CARGO_NET_GIT_FETCH_WITH_CLI": "true"
+  },
+  
+  // Development settings
+  "forwardPorts": [
+    3000,  // Web server
+    8080,  // Android development
+    9090   // Monitoring/metrics
+  ],
+  
+  "portsAttributes": {
+    "3000": {
+      "label": "Web Server",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "Android Development",
+      "onAutoForward": "silent"
+    },
+    "9090": {
+      "label": "Monitoring",
+      "onAutoForward": "silent"
+    }
+  },
+  
+  // Lifecycle scripts
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "git config --global --add safe.directory /workspace",
+  
+  // User settings
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspace",
+  
+  // Features to install
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "ppa": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": true
+    }
+  },
+  
+  // Container overrides
+  "overrideCommand": false,
+  "shutdownAction": "stopContainer"
+}

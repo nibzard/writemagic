@@ -1,0 +1,30 @@
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+
+# --- COMMIT END ---
+# Type can be:
+#   feat     (new feature)
+#   fix      (bug fix)
+#   docs     (changes to documentation)
+#   style    (formatting, missing semi colons, etc; no code change)
+#   refactor (refactoring production code)
+#   test     (adding tests, refactoring tests; no production code change)
+#   chore    (updating build tasks, package manager configs, etc; no production code change)
+#   perf     (performance improvements)
+#   ci       (CI/CD pipeline changes)
+#
+# Scope can be:
+#   mobile   (mobile app changes)
+#   core     (rust core engine changes)
+#   ai       (AI integration changes)
+#   ux       (user experience changes)
+#   infra    (infrastructure changes)
+#   docs     (documentation changes)
+#   agents   (sub-agent system changes)
+#
+# Subject should use imperative mood: "fix bug" not "fixed bug"
+# Body should explain what and why vs. how
+# Footer should contain any BREAKING CHANGE or issue references

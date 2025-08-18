@@ -1,0 +1,42 @@
+[package]
+name = "writemagic-writing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Workspace dependencies
+writemagic-shared = { path = "../shared" }
+
+# Async
+async-trait.workspace = true
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Database
+sqlx.workspace = true
+
+# UUID and time
+uuid.workspace = true
+chrono.workspace = true
+
+# Validation
+validator.workspace = true
+
+# Text processing
+regex.workspace = true
+unicode-segmentation.workspace = true
+
+# Logging
+log.workspace = true
+tracing.workspace = true

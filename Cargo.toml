@@ -1,0 +1,106 @@
+[workspace]
+resolver = "2"
+members = [
+    "core/shared",
+    "core/writing",
+    "core/ai",
+    "core/project",
+    "core/version_control",
+    "core/agent",
+    "ffi/android",
+    "ffi/ios",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["WriteMagic Team"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/writemagic/writemagic"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+
+# Git integration
+git2 = "0.18"
+
+# HTTP client for AI providers
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# UUID and time
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+log = "0.4"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Cross-platform FFI
+cxx = "1.0"
+
+# Android FFI
+jni = "0.21"
+android_logger = "0.13"
+
+# Validation
+validator = { version = "0.16", features = ["derive"] }
+
+# Configuration
+config = "0.13"
+
+# Text processing
+regex = "1.0"
+unicode-segmentation = "1.0"
+
+# Crypto
+aes-gcm = "0.10"
+sha2 = "0.10"
+
+# iOS specific
+libc = "0.2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+debug = true
+opt-level = 0
+
+# Cross-compilation targets
+[workspace.metadata.cross]
+[workspace.metadata.cross.target.aarch64-linux-android]
+dockerfile = "docker/Dockerfile.android"
+
+[workspace.metadata.cross.target.armv7-linux-androideabi]
+dockerfile = "docker/Dockerfile.android"
+
+[workspace.metadata.cross.target.i686-linux-android]
+dockerfile = "docker/Dockerfile.android"
+
+[workspace.metadata.cross.target.x86_64-linux-android]
+dockerfile = "docker/Dockerfile.android"
+
+[workspace.metadata.cross.target.aarch64-apple-ios]
+dockerfile = "docker/Dockerfile.ios"
+
+[workspace.metadata.cross.target.x86_64-apple-ios]
+dockerfile = "docker/Dockerfile.ios"

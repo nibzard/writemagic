@@ -1,0 +1,90 @@
+# SwiftFormat configuration for WriteMagic iOS
+# https://github.com/nicklockwood/SwiftFormat
+
+# Swift version for syntax rules
+--swiftversion 5.9
+
+# Indentation
+--indent 4
+--tabwidth 4
+--smarttabs enabled
+
+# Spacing
+--trimwhitespace always
+--commas always
+--semicolons never
+
+# Wrapping
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--wrapconditions before-first
+--wrapreturntype if-multiline
+--wraptypealiases before-first
+--wrapternary before-operators
+
+# Closures
+--closingparen balanced
+--closurevoid remove
+
+# Control flow
+--elseposition same-line
+--guardelse auto
+
+# Imports
+--importgrouping testable-bottom
+
+# Redundancy
+--redundanttype inferred
+--redundantbackticks false
+--redundantparens false
+--redundantget false
+--redundantfileprivate false
+
+# Organization
+--header strip
+
+# Line breaks
+--linebreaks lf
+--maxwidth 120
+
+# Enabled rules
+--enable isEmpty
+--enable sortedImports
+--enable duplicateImports
+--enable unusedArguments
+--enable hoistPatternLet
+--enable wrapMultilineStatementBraces
+--enable blankLinesAtStartOfScope
+--enable blankLinesAtEndOfScope
+--enable blankLinesBetweenScopes
+--enable spaceAroundBraces
+--enable spaceAroundBrackets
+--enable spaceAroundComments
+--enable spaceAroundGenerics
+--enable spaceAroundOperators
+--enable spaceAroundParens
+--enable spaceInsideBraces
+--enable spaceInsideBrackets
+--enable spaceInsideComments
+--enable spaceInsideGenerics
+--enable spaceInsideParens
+
+# Disabled rules
+--disable organizeDeclarations
+--disable andOperator
+--disable assertionFailures
+
+# Specific rule configurations
+--ifdef no-indent
+--ranges no-space
+
+# File exclusions (relative to config file)
+--exclude Pods
+--exclude build
+--exclude DerivedData
+--exclude fastlane
+--exclude .build
+
+# Fragment exclusions
+--fragment false
