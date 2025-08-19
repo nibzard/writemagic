@@ -7,7 +7,7 @@ use writemagic_shared::{EntityId, Result, WritemagicError};
 use crate::entities::{Document, Project};
 use crate::repositories::{DocumentRepository, ProjectRepository};
 use crate::services::{DocumentManagementService, ProjectManagementService, ContentAnalysisService};
-use crate::value_objects::{DocumentContent, DocumentTitle};
+use crate::value_objects::{DocumentContent, DocumentTitle, TextSelection};
 
 use writemagic_ai::{
     AIWritingService, 
@@ -21,8 +21,22 @@ use writemagic_ai::{
     ConversationSession,
     ContentAnalysis,
     RelatedDocument,
-    TextSelection, // Import from AI module
+    TextSelection as AITextSelection, // Import from AI module, renamed to avoid conflict
 };
+
+// Helper functions to convert between AI and writing domain types
+fn convert_text_selection_to_ai(selection: Option<TextSelection>) -> Option<AITextSelection> {
+    selection.map(|sel| AITextSelection {
+        start: sel.start,
+        end: sel.end,
+    })
+}
+
+fn convert_text_selection_from_ai(selection: Option<AITextSelection>) -> Option<TextSelection> {
+    selection.and_then(|sel| {
+        TextSelection::new(sel.start, sel.end).ok()
+    })
+}
 
 /// Integrated writing assistance service that combines AI with document management
 pub struct IntegratedWritingService {
@@ -459,7 +473,7 @@ impl IntegratedWritingService {
             document_title: document.title.clone(),
             document_content: document.content.clone(),
             content_type: document.content_type.clone(),
-            selection,
+            selection: convert_text_selection_to_ai(selection),
             project_context,
             conversation_history: Vec::new(), // Will be populated by AI service
             user_preferences: WritingPreferences::default(),

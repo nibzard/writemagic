@@ -10,8 +10,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.writemagic.ui.theme.WriteMagicTheme
 import com.writemagic.ui.WriteMagicApp
+import com.writemagic.core.WriteMagicCore
 
 class MainActivity : ComponentActivity() {
     
@@ -31,6 +34,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
+        // Initialize WriteMagic core with persistent SQLite
+        lifecycleScope.launch {
+            val initialized = WriteMagicCore.initialize()
+            if (initialized) {
+                println("WriteMagic core initialized successfully")
+            } else {
+                println("Failed to initialize WriteMagic core")
+            }
+        }
+        
         setContent {
             WriteMagicTheme {
                 Surface(
@@ -42,11 +55,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-    
-    // JNI method declarations for Rust FFI
-    external fun initializeCore(): Boolean
-    external fun createDocument(title: String): String
-    external fun saveDocument(documentId: String, content: String): Boolean
-    external fun loadDocument(documentId: String): String
-    external fun processAIRequest(prompt: String, context: String): String
 }

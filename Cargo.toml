@@ -83,6 +83,10 @@ rayon = "1.10"
 # Benchmarking and testing
 criterion = { version = "0.5", features = ["html_reports"] }
 proptest = "1.5"
+testcontainers = "0.15"
+testcontainers-modules = { version = "0.3", features = ["postgres"] }
+axum-test = "14.0"
+tempfile = "3.8"
 
 # Advanced performance
 memmap2 = "0.9"
@@ -95,7 +99,6 @@ tikv-jemalloc-ctl = { version = "0.5", optional = true }
 
 # Observability
 tracing-appender = { version = "0.2", optional = true }
-tracing-opentelemetry = { version = "0.25", optional = true }
 
 # Cross-platform FFI
 cxx = "1.0"

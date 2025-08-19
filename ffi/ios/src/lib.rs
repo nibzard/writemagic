@@ -3,33 +3,58 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
 use std::sync::{Arc, Mutex, Once};
-use writemagic_shared::{EntityId, Pagination, ContentType};
-use writemagic_writing::{CoreEngine, ApplicationConfigBuilder};
-use writemagic_writing::entities::{Document, Project};
+use writemagic_shared::{EntityId, ContentType, Repository, Pagination};
+use writemagic_writing::{
+    CoreEngine, ApplicationConfigBuilder, ApplicationConfig, AIConfig,
+    entities::{Document, Project},
+    value_objects::{DocumentTitle, DocumentContent, ProjectName},
+    services::{DocumentManagementService, ProjectManagementService},
+    repositories::{DocumentRepository, ProjectRepository},
+};
 
 static INIT: Once = Once::new();
-static mut CORE_ENGINE: Option<Arc<Mutex<Option<CoreEngine>>>> = None;
+static mut CORE_ENGINE: Option<Arc<Mutex<CoreEngine>>> = None;
+
+/// Get or initialize the core engine with configuration
+async fn get_or_create_core_engine(claude_key: Option<String>, openai_key: Option<String>) -> Result<Arc<Mutex<CoreEngine>>, String> {
+    unsafe {
+        if CORE_ENGINE.is_none() {
+            log::info!("Creating new CoreEngine instance for iOS");
+            
+            let engine = ApplicationConfigBuilder::new()
+                .with_sqlite()  // Use persistent SQLite for iOS
+                .with_claude_key(claude_key.unwrap_or_else(|| "".to_string()))
+                .with_openai_key(openai_key.unwrap_or_else(|| "".to_string()))
+                .with_log_level("info".to_string())
+                .with_content_filtering(true)
+                .build()
+                .await
+                .map_err(|e| format!("Failed to create CoreEngine: {}", e))?;
+                
+            CORE_ENGINE = Some(Arc::new(Mutex::new(engine)));
+        }
+        Ok(CORE_ENGINE.as_ref().unwrap().clone())
+    }
+}
+
+/// Get existing core engine (if initialized)
+fn get_core_engine() -> Result<Arc<Mutex<CoreEngine>>, String> {
+    unsafe {
+        CORE_ENGINE.as_ref()
+            .map(Arc::clone)
+            .ok_or_else(|| "CoreEngine not initialized - call initialize first".to_string())
+    }
+}
 
 /// Initialize logging for iOS
 fn init_logging() {
     INIT.call_once(|| {
-        unsafe {
-            CORE_ENGINE = Some(Arc::new(Mutex::new(None)));
-        }
-        
         #[cfg(target_os = "ios")]
         {
             // Initialize iOS-specific logging
             log::info!("WriteMagic iOS FFI initialized");
         }
     });
-}
-
-/// Get the core engine instance
-fn get_core_engine() -> Option<Arc<Mutex<Option<CoreEngine>>>> {
-    unsafe {
-        CORE_ENGINE.as_ref().map(Arc::clone)
-    }
 }
 
 /// Execute async function with runtime
@@ -79,44 +104,25 @@ pub extern "C" fn writemagic_initialize_with_ai(
         }
     };
 
-    let engine_result = execute_async(async {
-        let mut builder = ApplicationConfigBuilder::new();
-        
-        if use_sqlite == 1 {
-            builder = builder.with_sqlite();
-        } else {
-            builder = builder.with_sqlite_in_memory();
+    // Initialize the core engine with async runtime
+    let result = std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            get_or_create_core_engine(claude_api_key, openai_api_key).await
+        })
+    }).join();
+    
+    match result {
+        Ok(Ok(_)) => {
+            log::info!("WriteMagic core engine initialized successfully");
+            1
         }
-        
-        if let Some(claude_key) = claude_api_key {
-            builder = builder.with_claude_key(claude_key);
-        }
-        
-        if let Some(openai_key) = openai_api_key {
-            builder = builder.with_openai_key(openai_key);
-        }
-        
-        builder
-            .with_log_level("info".to_string())
-            .with_content_filtering(true)
-            .build()
-            .await
-    });
-
-    match engine_result {
-        Ok(engine) => {
-            if let Some(core_ref) = get_core_engine() {
-                if let Ok(mut guard) = core_ref.lock() {
-                    *guard = Some(engine);
-                    log::info!("WriteMagic core engine initialized successfully with AI");
-                    return 1;
-                }
-            }
-            log::error!("Failed to store core engine instance");
+        Ok(Err(e)) => {
+            log::error!("Failed to initialize WriteMagic core engine: {}", e);
             0
         }
-        Err(e) => {
-            log::error!("Failed to initialize core engine: {}", e);
+        Err(_) => {
+            log::error!("Thread panic during initialization");
             0
         }
     }
@@ -168,34 +174,63 @@ pub extern "C" fn writemagic_create_document(
     log::info!("Creating document: {} ({})", title, content_type_str);
     
     let result = execute_async(async {
-        if let Some(core_ref) = get_core_engine() {
-            if let Ok(guard) = core_ref.lock() {
-                if let Some(ref engine) = *guard {
-                    let content_type = ContentType::from_string(content_type_str)
-                        .unwrap_or(ContentType::Markdown);
-                    
-                    let document = Document::new(
-                        title.to_string(),
-                        content.to_string(),
+        match get_core_engine() {
+            Ok(engine) => {
+                let engine_guard = match engine.lock() {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        log::error!("Failed to lock core engine: {}", e);
+                        return None;
+                    }
+                };
+                
+                let document_title = match DocumentTitle::new(title) {
+                    Ok(title) => title,
+                    Err(e) => {
+                        log::error!("Invalid document title: {}", e);
+                        return None;
+                    }
+                };
+                
+                let document_content = match DocumentContent::new(content) {
+                    Ok(content) => content,
+                    Err(e) => {
+                        log::error!("Invalid document content: {}", e);
+                        return None;
+                    }
+                };
+                
+                let content_type = match content_type_str {
+                    "markdown" => ContentType::Markdown,
+                    "plain_text" => ContentType::PlainText,
+                    "html" => ContentType::Html,
+                    _ => ContentType::PlainText,
+                };
+                
+                match engine_guard.runtime().block_on(async {
+                    engine_guard.document_service().create_document(
+                        document_title,
+                        document_content,
                         content_type,
-                        None, // No user context in FFI for now
-                    );
-                    
-                    let repo = engine.document_repository();
-                    match repo.save(&document).await {
-                        Ok(saved_doc) => {
-                            log::info!("Document created successfully: {}", saved_doc.id);
-                            return Some(saved_doc.id.to_string());
-                        }
-                        Err(e) => {
-                            log::error!("Failed to save document: {}", e);
-                            return None;
-                        }
+                        None, // created_by - would be set from authentication context
+                    ).await
+                }) {
+                    Ok(aggregate) => {
+                        let document = aggregate.document();
+                        log::info!("Document created successfully: {}", document.id);
+                        Some(document.id.to_string())
+                    }
+                    Err(e) => {
+                        log::error!("Failed to create document: {}", e);
+                        None
                     }
                 }
             }
+            Err(e) => {
+                log::error!("Failed to get core engine: {}", e);
+                None
+            }
         }
-        None
     });
     
     match result {
@@ -239,50 +274,56 @@ pub extern "C" fn writemagic_update_document_content(
     log::info!("Updating document {} with new content", document_id_str);
     
     let result = execute_async(async {
-        if let Some(core_ref) = get_core_engine() {
-            if let Ok(guard) = core_ref.lock() {
-                if let Some(ref engine) = *guard {
-                    let entity_id = match EntityId::from_string(document_id_str) {
-                        Ok(id) => id,
-                        Err(e) => {
-                            log::error!("Invalid document ID: {}", e);
-                            return false;
-                        }
-                    };
-                    
-                    let repo = engine.document_repository();
-                    
-                    // Load the document
-                    match repo.find_by_id(&entity_id).await {
-                        Ok(Some(mut document)) => {
-                            // Update content
-                            document.update_content(content.to_string(), None);
-                            
-                            // Save updated document
-                            match repo.save(&document).await {
-                                Ok(_) => {
-                                    log::info!("Document updated successfully: {}", entity_id);
-                                    return true;
-                                }
-                                Err(e) => {
-                                    log::error!("Failed to save updated document: {}", e);
-                                    return false;
-                                }
-                            }
-                        }
-                        Ok(None) => {
-                            log::error!("Document not found: {}", entity_id);
-                            return false;
-                        }
-                        Err(e) => {
-                            log::error!("Failed to load document: {}", e);
-                            return false;
-                        }
+        match get_core_engine() {
+            Ok(engine) => {
+                let engine_guard = match engine.lock() {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        log::error!("Failed to lock core engine: {}", e);
+                        return false;
+                    }
+                };
+                
+                // Parse document ID
+                let document_id = match uuid::Uuid::parse_str(document_id_str) {
+                    Ok(uuid) => EntityId::from_uuid(uuid),
+                    Err(e) => {
+                        log::error!("Invalid document ID format: {}", e);
+                        return false;
+                    }
+                };
+                
+                let document_content = match DocumentContent::new(content) {
+                    Ok(content) => content,
+                    Err(e) => {
+                        log::error!("Invalid document content: {}", e);
+                        return false;
+                    }
+                };
+                
+                match engine_guard.runtime().block_on(async {
+                    engine_guard.document_service().update_document_content(
+                        document_id,
+                        document_content,
+                        None, // text selection
+                        None, // updated_by - would be set from authentication context
+                    ).await
+                }) {
+                    Ok(_) => {
+                        log::info!("Successfully updated document {}", document_id_str);
+                        true
+                    }
+                    Err(e) => {
+                        log::error!("Failed to update document content: {}", e);
+                        false
                     }
                 }
             }
+            Err(e) => {
+                log::error!("Failed to get core engine: {}", e);
+                false
+            }
         }
-        false
     });
     
     if result { 1 } else { 0 }
@@ -308,54 +349,59 @@ pub extern "C" fn writemagic_get_document(document_id: *const c_char) -> *mut c_
     log::info!("Getting document {}", document_id_str);
     
     let result = execute_async(async {
-        if let Some(core_ref) = get_core_engine() {
-            if let Ok(guard) = core_ref.lock() {
-                if let Some(ref engine) = *guard {
-                    let entity_id = match EntityId::from_string(document_id_str) {
-                        Ok(id) => id,
-                        Err(e) => {
-                            log::error!("Invalid document ID: {}", e);
-                            return None;
-                        }
-                    };
-                    
-                    let repo = engine.document_repository();
-                    
-                    match repo.find_by_id(&entity_id).await {
-                        Ok(Some(document)) => {
-                            let document_json = serde_json::json!({
-                                "id": document.id.to_string(),
-                                "title": document.title,
-                                "content": document.content,
-                                "contentType": document.content_type.to_string(),
-                                "contentHash": document.content_hash.to_string(),
-                                "filePath": document.file_path.as_ref().map(|p| p.to_string()),
-                                "wordCount": document.word_count,
-                                "characterCount": document.character_count,
-                                "createdAt": document.created_at.to_string(),
-                                "updatedAt": document.updated_at.to_string(),
-                                "createdBy": document.created_by.as_ref().map(|id| id.to_string()),
-                                "updatedBy": document.updated_by.as_ref().map(|id| id.to_string()),
-                                "version": document.version,
-                                "isDeleted": document.is_deleted,
-                                "deletedAt": document.deleted_at.as_ref().map(|t| t.to_string())
-                            });
-                            
-                            return Some(document_json.to_string());
-                        }
-                        Ok(None) => {
-                            log::error!("Document not found: {}", entity_id);
-                            return None;
-                        }
-                        Err(e) => {
-                            log::error!("Failed to load document: {}", e);
-                            return None;
-                        }
+        match get_core_engine() {
+            Ok(engine) => {
+                let engine_guard = match engine.lock() {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        log::error!("Failed to lock core engine: {}", e);
+                        return None;
+                    }
+                };
+                
+                // Parse document ID
+                let document_id = match uuid::Uuid::parse_str(document_id_str) {
+                    Ok(uuid) => EntityId::from_uuid(uuid),
+                    Err(e) => {
+                        log::error!("Invalid document ID format: {}", e);
+                        return None;
+                    }
+                };
+                
+                match engine_guard.runtime().block_on(async {
+                    engine_guard.document_repository().find_by_id(&document_id).await
+                }) {
+                    Ok(Some(document)) => {
+                        let response = serde_json::json!({
+                            "id": document.id.to_string(),
+                            "title": document.title,
+                            "content": document.content,
+                            "contentType": document.content_type.to_string(),
+                            "wordCount": document.word_count,
+                            "characterCount": document.character_count,
+                            "createdAt": document.created_at.to_string(),
+                            "updatedAt": document.updated_at.to_string(),
+                            "version": document.version,
+                            "isDeleted": document.is_deleted
+                        });
+                        
+                        Some(response.to_string())
+                    }
+                    Ok(None) => {
+                        log::warn!("Document {} not found", document_id_str);
+                        None
+                    }
+                    Err(e) => {
+                        log::error!("Failed to retrieve document: {}", e);
+                        None
                     }
                 }
             }
+            Err(e) => {
+                log::error!("Failed to get core engine: {}", e);
+                None
+            }
         }
-        None
     });
     
     match result {
@@ -403,37 +449,40 @@ pub extern "C" fn writemagic_complete_text(
     log::info!("Completing text with model {:?} and prompt: {}", model, prompt);
     
     let result = execute_async(async {
-        if let Some(core_ref) = get_core_engine() {
-            if let Ok(guard) = core_ref.lock() {
-                if let Some(ref engine) = *guard {
-                    match engine.complete_text(prompt.to_string(), model).await {
-                        Ok(completion) => {
-                            let response = serde_json::json!({
-                                "completion": completion,
-                                "success": true
-                            });
-                            Some(response.to_string())
-                        }
-                        Err(e) => {
-                            log::error!("AI completion failed: {}", e);
-                            let error_response = serde_json::json!({
-                                "error": e.to_string(),
-                                "success": false
-                            });
-                            Some(error_response.to_string())
-                        }
+        match get_core_engine() {
+            Ok(engine) => {
+                let engine_guard = match engine.lock() {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        log::error!("Failed to lock core engine: {}", e);
+                        return None;
                     }
-                } else {
-                    log::error!("CoreEngine not initialized");
-                    None
+                };
+                
+                match engine_guard.runtime().block_on(async {
+                    engine_guard.complete_text(prompt.to_string(), model).await
+                }) {
+                    Ok(completion) => {
+                        let response = serde_json::json!({
+                            "completion": completion,
+                            "success": true
+                        });
+                        Some(response.to_string())
+                    }
+                    Err(e) => {
+                        log::error!("AI completion failed: {}", e);
+                        let error_response = serde_json::json!({
+                            "error": e.to_string(),
+                            "success": false
+                        });
+                        Some(error_response.to_string())
+                    }
                 }
-            } else {
-                log::error!("Failed to lock core engine");
+            }
+            Err(e) => {
+                log::error!("Failed to get core engine: {}", e);
                 None
             }
-        } else {
-            log::error!("CoreEngine reference not available");
-            None
         }
     });
     

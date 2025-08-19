@@ -6,15 +6,15 @@
 [![Security](https://github.com/nibzard/writemagic/actions/workflows/security.yml/badge.svg)](https://github.com/nibzard/writemagic/actions)
 [![Mobile CI](https://github.com/nibzard/writemagic/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/nibzard/writemagic/actions)
 
-WriteMagic is a revolutionary writing application that combines the power of AI with intuitive cross-platform design. Built with a high-performance Rust core and native mobile UIs, it offers a seamless writing experience across iOS and Android devices.
+WriteMagic is a revolutionary writing application that combines the power of AI with intuitive cross-platform design. Built with a high-performance Rust core, it offers a seamless writing experience across Android and web platforms.
 
 ## ✨ Key Features
 
 - **🎨 Multi-Pane Writing**: Each pane corresponds to a Git branch, enabling parallel writing exploration
 - **🤖 AI Integration**: Provider-agnostic support for Claude, GPT-4, and local models with intelligent fallbacks
-- **📱 Native Mobile**: SwiftUI (iOS) and Jetpack Compose (Android) for optimal platform experiences
+- **📱 Cross-Platform**: Native Android (Jetpack Compose) and Progressive Web App (WASM)
 - **🌊 Git Timeline**: Beautiful visualization of your writing journey across branches
-- **⚡ High Performance**: Rust core engine with memory-safe FFI bindings
+- **⚡ High Performance**: Rust core engine with memory-safe FFI and WASM bindings
 - **🔧 Agent Automation**: YAML-based background agents for workflow optimization
 
 ## 🏗️ Architecture
@@ -23,11 +23,12 @@ WriteMagic follows a **Domain-Driven Design** architecture with specialized sub-
 
 ```
 ┌─────────────────┬─────────────────┐
-│   iOS (Swift)   │ Android (Kotlin)│  ← Native UIs
+│     Web         │ Android (Kotlin)│  ← Cross-platform UIs
+│   (WASM/PWA)    │  (Jetpack)      │
 ├─────────────────┼─────────────────┤
-│        FFI Bindings (C/JNI)       │  ← Cross-platform layer
+│    WASM Bindings │  FFI (JNI)     │  ← Platform bridges
 ├─────────────────────────────────────┤
-│           Rust Core Engine          │  ← Business logic
+│           Rust Core Engine          │  ← Shared business logic
 │  ┌─────────┬─────────┬─────────┐   │
 │  │Writing  │   AI    │ Project │   │  ← Domain modules
 │  │ Domain  │ Domain  │ Domain  │   │
@@ -65,39 +66,261 @@ cd writemagic
 pre-commit install
 ```
 
-### 2. Development Environment
+### 2. Development Environment Setup
 
-#### Option A: DevContainer (Recommended)
-```bash
-# Open in VS Code with Dev Containers extension
-code .
-# Select "Reopen in Container"
-```
+#### Step 1: Install Rust and Dependencies
 
-#### Option B: Local Setup
 ```bash
-# Install Rust targets
-rustup target add aarch64-linux-android armv7-linux-androideabi
+# Install Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+
+# Install build dependencies (Linux/Ubuntu)
+sudo apt update && sudo apt install -y pkg-config libssl-dev build-essential
+
+# Add Android cross-compilation targets
+rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+
+# Add iOS targets (macOS only)
 rustup target add aarch64-apple-ios x86_64-apple-ios
 
-# Install additional tools
+# Install additional development tools
 cargo install cargo-audit cargo-deny cargo-udeps
 ```
 
-### 3. Build and Test
+#### Step 2: Android NDK Setup (Required for Android Development)
+
+**Option A: Install via Android Studio (Recommended)**
+1. Download and install [Android Studio](https://developer.android.com/studio)
+2. Open Android Studio → Tools → SDK Manager → SDK Tools
+3. Install "NDK (Side by side)" - version 25+ recommended
+4. Add NDK to environment:
 
 ```bash
-# Build Rust workspace
-cargo build --workspace
+export ANDROID_NDK_ROOT="$HOME/Android/Sdk/ndk/25.2.9519653"  # Adjust version
+export PATH="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+```
+
+**Option B: Direct NDK Installation**
+```bash
+# Download NDK from https://developer.android.com/ndk/downloads
+wget https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
+unzip android-ndk-r25c-linux.zip -d ~/android-ndk/
+
+# Set environment variables
+export ANDROID_NDK_ROOT="$HOME/android-ndk/android-ndk-r25c"
+export PATH="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+
+# Add to your shell profile (.bashrc, .zshrc, etc.)
+echo 'export ANDROID_NDK_ROOT="$HOME/android-ndk/android-ndk-r25c"' >> ~/.bashrc
+echo 'export PATH="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"' >> ~/.bashrc
+```
+
+#### Step 3: Verify Installation
+
+```bash
+# Verify Rust setup
+cargo --version
+rustc --version
+
+# Verify Android NDK
+aarch64-linux-android-clang --version
+
+# Test Android FFI compilation
+cargo check --package writemagic-android-ffi
+```
+
+### 3. Build Native Libraries
+
+#### Android Native Libraries (Required for Android App)
+
+```bash
+# Build for all Android architectures
+cargo build --release --target aarch64-linux-android --package writemagic-android-ffi
+cargo build --release --target armv7-linux-androideabi --package writemagic-android-ffi  
+cargo build --release --target x86_64-linux-android --package writemagic-android-ffi
+
+# Copy libraries to Android project
+mkdir -p android/app/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86_64}
+cp target/aarch64-linux-android/release/libwritemagic_android_ffi.so android/app/src/main/jniLibs/arm64-v8a/
+cp target/armv7-linux-androideabi/release/libwritemagic_android_ffi.so android/app/src/main/jniLibs/armeabi-v7a/
+cp target/x86_64-linux-android/release/libwritemagic_android_ffi.so android/app/src/main/jniLibs/x86_64/
+```
+
+#### Web Native Libraries (WASM) - **NEW MVP REQUIREMENT**
+
+```bash
+# Install wasm-pack for WebAssembly builds
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+# Add WASM target
+rustup target add wasm32-unknown-unknown
+
+# Build WASM module for web
+wasm-pack build --target web --out-dir pkg ffi/web/
+
+# Or build for bundlers (webpack, rollup, etc.)
+wasm-pack build --target bundler --out-dir pkg ffi/web/
+
+# Generated files will be in ffi/web/pkg/
+# - writemagic_web.js (JavaScript bindings)
+# - writemagic_web_bg.wasm (WebAssembly module)
+# - package.json (npm package info)
+```
+
+#### iOS Native Libraries (macOS only - Post-MVP)
+
+```bash
+# Build for iOS targets (Phase 3)
+cargo build --release --target aarch64-apple-ios --package writemagic-ios-ffi
+cargo build --release --target x86_64-apple-ios --package writemagic-ios-ffi
+
+# Create universal library (if needed)
+lipo -create \
+    target/aarch64-apple-ios/release/libwritemagic_ios_ffi.a \
+    target/x86_64-apple-ios/release/libwritemagic_ios_ffi.a \
+    -output ios/libwritemagic_ios_ffi.a
+```
+
+### 4. Build Applications
+
+#### Android App
+```bash
+cd android
+
+# Clean and build
+./gradlew clean assembleDebug
+
+# Install on device/emulator
+./gradlew installDebug
 
 # Run tests
+./gradlew test
+```
+
+#### Web Application - **NEW MVP PRIORITY**
+```bash
+cd web
+
+# Install web dependencies (if using a framework)
+npm install
+
+# Build WASM module
+wasm-pack build --target web --out-dir pkg ../ffi/web/
+
+# Development server
+npm run dev
+# or serve static files
+python -m http.server 8000
+
+# Production build
+npm run build
+
+# Test web application
+npm test
+```
+
+#### iOS App (Phase 3 - Post-MVP)
+```bash
+cd ios
+
+# Build for simulator (Phase 3)
+xcodebuild -scheme WriteMagic -destination 'platform=iOS Simulator,name=iPhone 15' build
+
+# Build for device (Phase 3)
+xcodebuild -scheme WriteMagic -destination 'generic/platform=iOS' build
+```
+
+### 5. Verification and Testing
+
+```bash
+# Run all Rust tests
 cargo test --workspace
 
-# Build Android app
-cd android && ./gradlew assembleDebug
+# Lint and format
+cargo clippy -- -D warnings
+cargo fmt --check
 
-# Build iOS app (macOS only)
-cd ios && xcodebuild -scheme WriteMagic build
+# Security audit
+cargo audit
+
+# Test Android integration
+cd android && ./gradlew connectedAndroidTest
+
+# Test iOS integration (macOS only)
+cd ios && xcodebuild -scheme WriteMagic -destination 'platform=iOS Simulator,name=iPhone 15' test
+```
+
+## 🔧 Troubleshooting
+
+### Common Android Build Issues
+
+#### Issue: `cargo: command not found`
+**Solution**: Ensure Rust is properly installed and sourced:
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+```
+
+#### Issue: `failed to find tool "aarch64-linux-android-clang"`
+**Solution**: Android NDK is not installed or not in PATH:
+```bash
+# Verify NDK installation
+which aarch64-linux-android-clang
+
+# If not found, install Android NDK (see Step 2 above)
+export ANDROID_NDK_ROOT="/path/to/your/android-ndk"
+export PATH="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+```
+
+#### Issue: `Could not find OpenSSL installation`
+**Solution**: Install OpenSSL development libraries:
+```bash
+# Ubuntu/Debian
+sudo apt install pkg-config libssl-dev
+
+# CentOS/RHEL/Fedora
+sudo yum install pkgconfig openssl-devel
+```
+
+#### Issue: Android App crashes with `UnsatisfiedLinkError`
+**Solution**: Native libraries missing from APK:
+```bash
+# Ensure libraries are built and copied
+ls android/app/src/main/jniLibs/arm64-v8a/libwritemagic_android_ffi.so
+
+# If missing, rebuild native libraries:
+cargo build --release --target aarch64-linux-android --package writemagic-android-ffi
+cp target/aarch64-linux-android/release/libwritemagic_android_ffi.so android/app/src/main/jniLibs/arm64-v8a/
+```
+
+### FFI Compilation Issues
+
+#### Issue: Method name compilation errors
+**Status**: ✅ **RESOLVED** - Fixed in latest version
+The following FFI method name issues have been resolved:
+- `engine_guard.document_service()` → `engine_guard.document_management_service()`
+- `engine_guard.project_service()` → `engine_guard.project_management_service()`
+
+#### Issue: JNI parameter type errors
+**Status**: ✅ **RESOLVED** - Fixed in latest version
+JNI string parameter issues resolved:
+- All `env.get_string(param)` calls now use `env.get_string(&param)`
+- All `JNIEnv` parameters are now declared as `mut env: JNIEnv`
+
+### Performance Optimization
+
+#### For faster compilation:
+```bash
+# Use parallel compilation
+export CARGO_BUILD_JOBS=4
+
+# Use faster linker (Linux)
+sudo apt install mold
+export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+
+# Use release mode for faster runtime
+cargo build --release --target aarch64-linux-android --package writemagic-android-ffi
 ```
 
 ## 📚 Development Workflow
@@ -107,10 +330,11 @@ WriteMagic uses a **sub-agent coordination system** for organized development:
 ### 🤖 Sub-Agents
 
 - **@project-manager**: Coordinates tasks and maintains project structure
-- **@mobile-architect**: iOS/Android development and cross-platform architecture  
+- **@mobile-architect**: Android development and cross-platform architecture
+- **@web-developer**: Progressive Web App development with WASM integration - **PROMOTED TO MVP**
 - **@ai-integration-specialist**: LLM provider abstractions and AI features
-- **@rust-core-engineer**: High-performance Rust engine with FFI bindings
-- **@ux-writing-specialist**: Writing-focused user experience design
+- **@rust-core-engineer**: High-performance Rust engine with FFI and WASM bindings
+- **@ux-writing-specialist**: Writing-focused user experience design across platforms
 - **@devops-platform-engineer**: Infrastructure, CI/CD, and deployment
 
 ### 🔄 Git Workflow
@@ -142,13 +366,13 @@ All tasks are tracked in [`todo.md`](todo.md) with structured format:
 
 ### Core Technologies
 - **Backend**: Rust with async/await, Domain-Driven Design
-- **Mobile**: SwiftUI (iOS), Jetpack Compose (Android)
+- **Platforms**: Progressive Web App (WASM), Native Android (Jetpack Compose)
 - **AI**: Provider-agnostic with Claude, OpenAI, local model support
-- **Data**: SQLite with Git for version control
+- **Data**: SQLite (Android), IndexedDB (Web) with future Git integration
 
 ### Development Tools
 - **CI/CD**: GitHub Actions with multi-platform builds
-- **Quality**: Clippy, rustfmt, ktlint, SwiftLint
+- **Quality**: Clippy, rustfmt, ktlint, wasm-pack
 - **Security**: cargo-audit, dependency scanning, secret detection
 - **Monitoring**: Prometheus, Grafana, distributed tracing
 
@@ -172,22 +396,42 @@ cd android
 - Minimum SDK: API 24 (Android 7.0)
 - Target SDK: API 34 (Android 14)
 
-### iOS Development
+### Web Development - **NEW MVP PRIORITY**
+
+```bash
+cd web
+
+# Install Node.js dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build && npm run preview
+```
+
+**Requirements:**
+- Node.js 18+ and npm
+- Modern browser with WASM support
+- wasm-pack for Rust to WASM compilation
+
+### iOS Development (Phase 3 - Post-MVP)
 
 ```bash
 cd ios
 
-# Build for simulator
+# Build for simulator (Phase 3)
 xcodebuild -scheme WriteMagic -destination 'platform=iOS Simulator,name=iPhone 15'
 
-# Build for device
+# Build for device (Phase 3)
 xcodebuild -scheme WriteMagic -destination 'generic/platform=iOS'
 ```
 
 **Requirements:**
-- Xcode 15+
-- iOS 17+ deployment target
-- Apple Developer account for device testing
+- Xcode 15+ (Phase 3)
+- iOS 17+ deployment target (Phase 3)
+- Apple Developer account for device testing (Phase 3)
 
 ## 🚢 Deployment
 
@@ -238,10 +482,10 @@ For security concerns, please see [SECURITY.md](SECURITY.md) for our security po
 
 ## 🌟 Roadmap
 
-- [ ] **Phase 1**: Core writing engine with basic AI integration
-- [ ] **Phase 2**: Advanced multi-pane workflows and Git visualization
-- [ ] **Phase 3**: Cloud sync and collaborative features
-- [ ] **Phase 4**: Plugin system and community extensions
+- [ ] **MVP**: Android app + Progressive Web App with AI-assisted writing
+- [ ] **Phase 2**: Advanced AI features and enhanced user experience
+- [ ] **Phase 3**: iOS application - Native SwiftUI implementation
+- [ ] **Phase 4**: Git integration, collaborative features, and plugin system
 
 ## 💬 Community
 

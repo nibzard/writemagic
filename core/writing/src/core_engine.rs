@@ -210,17 +210,17 @@ impl CoreEngine {
         };
 
         // Initialize AI services
-        let (ai_orchestration_service, content_filtering_service) = Self::initialize_ai_services(&config.ai).await?;
+        let (mut ai_orchestration_service, mut content_filtering_service) = Self::initialize_ai_services(&config.ai).await?;
         
         // Initialize context management service
         let context_management_service = ContextManagementService::new(config.ai.max_context_length);
 
         // Initialize AI writing service if AI orchestration is available
-        let ai_writing_service = if let (Some(orchestration), Some(content_filter)) = (&ai_orchestration_service, &content_filtering_service) {
-            // Clone the services into Arc
-            let orchestration_arc = Arc::new(orchestration.clone());
+        let ai_writing_service = if ai_orchestration_service.is_some() && content_filtering_service.is_some() {
+            // Take ownership of the services
+            let orchestration_arc = Arc::new(ai_orchestration_service.take().unwrap());
             let context_arc = Arc::new(context_management_service.clone());
-            let filter_arc = Arc::new(content_filter.clone());
+            let filter_arc = Arc::new(content_filtering_service.take().unwrap());
             
             Some(AIWritingService::new(orchestration_arc, context_arc, filter_arc))
         } else {
@@ -238,7 +238,7 @@ impl CoreEngine {
         let content_analysis_service = Arc::new(ContentAnalysisService::new());
 
         // Initialize integrated writing service if AI is available
-        let integrated_writing_service = if let Some(ref ai_writing) = ai_writing_service {
+        let integrated_writing_service = if let Some(ai_writing) = &ai_writing_service {
             let integrated = IntegratedWritingServiceBuilder::new()
                 .with_ai_writing_service(Arc::new(ai_writing.clone()))
                 .with_document_service(document_management_service.clone())

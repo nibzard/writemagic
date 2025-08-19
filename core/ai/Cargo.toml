@@ -10,7 +10,6 @@ repository.workspace = true
 [dependencies]
 # Workspace dependencies
 writemagic-shared = { path = "../shared" }
-writemagic-writing = { path = "../writing" }
 
 # Async
 async-trait.workspace = true

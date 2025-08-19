@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use writemagic_shared::{EntityId, Result, WritemagicError};
+use serde::{Serialize, Deserialize};
 
 use crate::providers::{AIProvider, CompletionRequest, CompletionResponse, Message, MessageRole};
 use crate::services::{AIOrchestrationService, ContextManagementService, ContentFilteringService};
@@ -294,6 +295,7 @@ impl ConversationSession {
 }
 
 /// AI Writing Service that provides writing-specific AI assistance
+#[derive(Clone)]
 pub struct AIWritingService {
     orchestration_service: Arc<AIOrchestrationService>,
     context_service: Arc<ContextManagementService>,
@@ -340,7 +342,7 @@ impl AIWritingService {
         let messages = self.build_messages(&request, &session).await?;
 
         // Configure model based on assistance type
-        let model_config = request.model_config.unwrap_or_else(|| {
+        let model_config = request.model_config.clone().unwrap_or_else(|| {
             self.get_default_model_config(&request.assistance_type)
         });
 
@@ -747,12 +749,14 @@ impl AIWritingService {
     }
 
     /// Helper methods for formatting and parsing
-    fn format_content_type(&self, content_type: &writemagic_shared::ContentType) -> &str {
+    fn format_content_type<'a>(&self, content_type: &'a writemagic_shared::ContentType) -> &'a str {
         match content_type {
             writemagic_shared::ContentType::PlainText => "plain text",
             writemagic_shared::ContentType::Markdown => "Markdown",
             writemagic_shared::ContentType::Html => "HTML",
-            writemagic_shared::ContentType::RichText => "rich text",
+            writemagic_shared::ContentType::Json => "JSON",
+            writemagic_shared::ContentType::Yaml => "YAML",
+            writemagic_shared::ContentType::Code { language } => language,
         }
     }
 
@@ -803,7 +807,7 @@ impl AIWritingService {
                     suggestions.push(WritingSuggestion {
                         suggestion_type: SuggestionType::Grammar,
                         original_text: None,
-                        suggested_text: content.clone(),
+                        suggested_text: content.to_string(),
                         explanation: "Grammar improvements suggested".to_string(),
                         confidence: 0.8,
                         position: None,
@@ -814,7 +818,7 @@ impl AIWritingService {
                 suggestions.push(WritingSuggestion {
                     suggestion_type: SuggestionType::Style,
                     original_text: None,
-                    suggested_text: content.clone(),
+                    suggested_text: content.to_string(),
                     explanation: "Style improvements suggested".to_string(),
                     confidence: 0.7,
                     position: None,

@@ -4,23 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WriteMagic is a cross-platform AI-powered writing application built with a Rust core engine and native mobile UIs. The architecture follows Domain-Driven Design principles with specialized sub-agents coordinating development across different expertise areas.
+WriteMagic is an AI-powered writing application focused on **Android mobile** and **web** platforms, built with a Rust core engine. The architecture follows Domain-Driven Design principles with functional implementations prioritized over mock code.
 
 ## Core Architecture
 
-### Multi-Layer Architecture
-- **Mobile UIs**: Native iOS (SwiftUI) and Android (Jetpack Compose) applications
-- **Rust Core**: Shared business logic engine with FFI bindings for mobile platforms
+### Multi-Layer Architecture (MVP Scope)
+- **Android App**: Native Kotlin/Jetpack Compose application with FFI integration
+- **Web Application**: Progressive Web App with WASM integration - **PROMOTED TO MVP**
+- **Rust Core**: Shared business logic engine with FFI and WASM bindings
 - **AI Integration**: Provider-agnostic LLM integration with Claude, GPT-4, and local model support
-- **Data Layer**: SQLite for local storage, Git for version control, cloud sync for cross-device
+- **Data Layer**: SQLite for local storage, IndexedDB for web
 
-### Domain Structure
+### Domain Structure (MVP Focus)
 The Rust core is organized into bounded contexts:
 - **Writing Domain**: Document management, content editing, project organization
 - **AI Domain**: LLM integration, context management, response processing
 - **Project Domain**: Multi-pane workspaces, session management
-- **Version Control Domain**: Git integration with beautiful timeline visualization
+
+### Out of MVP Scope
+The following features are planned for post-MVP phases:
+- **Version Control Domain**: Git integration with timeline visualization
 - **Agent Domain**: File-based YAML agents for background processing
+- **iOS Application**: Native SwiftUI implementation - **DEMOTED TO PHASE 3**
+- **CI/CD Pipeline**: Automated deployment and infrastructure
+- **Cloud Infrastructure**: Kubernetes deployment and monitoring
 
 ## Development Workflow
 
@@ -31,14 +38,14 @@ This project uses strict conventional commit standards. Set up git configuration
 ```
 
 Commit format: `type(scope): description`
-- **Types**: feat, fix, docs, style, refactor, test, chore, perf, ci
-- **Scopes**: mobile, core, ai, ux, infra, docs, agents
+- **Types**: feat, fix, docs, style, refactor, test, chore, perf
+- **Scopes**: android, web, core, ai, ux, docs
 
 Quick commit aliases:
 ```bash
-git feat mobile "add gesture navigation"
+git feat android "add gesture navigation"
 git fix core "resolve memory leak in FFI"
-git docs agents "update sub-agent documentation"
+git docs "update technical documentation"
 ```
 
 Branch naming: `feature/[agent]-[task-name]`, `fix/[agent]-[issue]`
@@ -54,58 +61,40 @@ All project tasks are centrally managed in `todo.md` with structured format:
 
 **Always update todo.md when starting, progressing, or completing tasks.**
 
-## Sub-Agent Coordination System
+## Development Team Focus Areas
 
-The project uses 6 specialized sub-agents located in `.claude/agents/`:
+The MVP development focuses on core functionality with streamlined team responsibilities:
 
-### 1. Project Manager (`@project-manager`)
-- Maintains todo.md and coordinates all agents
-- Enforces git workflow and conventional commits
-- Tracks milestones and manages project risks
+### Core MVP Team
+1. **Rust Core Engineer** - High-performance engine with Android FFI and WASM bindings
+2. **Android Developer** - Native Kotlin/Compose implementation
+3. **Web Developer** - Progressive Web App with WASM integration - **PROMOTED TO MVP**
+4. **AI Integration Specialist** - LLM provider abstractions for mobile and web
+5. **UX Writing Specialist** - Writing-focused user experience across platforms
 
-### 2. Mobile Architect (`@mobile-architect`)
-- iOS/Android development and cross-platform architecture
-- Platform-specific optimizations and native integrations
-- Mobile performance and UX implementation
+### Post-MVP Team Expansion
+Future phases will add:
+- **iOS Developer** - Native SwiftUI implementation (Phase 3)
+- **DevOps Engineer** - CI/CD and infrastructure automation (Phase 4)
+- **Project Manager** - Coordination and workflow management (Phase 4)
 
-### 3. AI Integration Specialist (`@ai-integration-specialist`)
-- LLM provider abstractions and fallback strategies
-- Context management and response processing
-- AI safety, cost optimization, and quality assurance
-
-### 4. Rust Core Engineer (`@rust-core-engineer`)
-- High-performance Rust engine with FFI bindings
-- Memory management, async operations, cross-platform compilation
-- Domain-driven design implementation
-
-### 5. UX Writing Specialist (`@ux-writing-specialist`)
-- Writing-focused user experience and workflow design
-- Multi-pane interfaces, gesture interactions, accessibility
-- Creative flow optimization
-
-### 6. DevOps Platform Engineer (`@devops-platform-engineer`)
-- Infrastructure, CI/CD, monitoring, and security
-- Kubernetes deployment and scalable cloud architecture
-
-### Agent Coordination Patterns
+### MVP Development Flow
 ```
-# Full feature development
-@project-manager Break down feature into tasks
-@ux-writing-specialist Design the interface
-@mobile-architect Implement mobile components
-@rust-core-engineer Build core logic
-@ai-integration-specialist Add AI features
-@devops-platform-engineer Deploy and monitor
-@project-manager Track progress and update todo.md
+1. Rust Core Engineer - Build functional domain logic with WASM support
+2. AI Integration Specialist - Implement provider integration for mobile and web
+3. Android Developer - Create native mobile interface with FFI
+4. Web Developer - Build Progressive Web App with WASM integration
+5. UX Writing Specialist - Optimize writing workflows across platforms
+6. All - Cross-platform integration testing and refinement
 ```
 
 ## Technical Specifications
 
-### Cross-Platform FFI Strategy
-- Rust core exposes C-compatible interfaces
-- Android: JNI bindings with Kotlin
-- iOS: Swift-C++ interop with Rust
-- Shared business logic, platform-specific UI
+### Cross-Platform FFI Strategy (MVP Focus)
+- **Android FFI**: Rust core exposes C-compatible interfaces for Android JNI bindings
+- **Web FFI**: WASM compilation with wasm-bindgen for JavaScript integration
+- **Shared business logic**: Same Rust domains across Android and web platforms
+- **Platform-specific UI**: Android-native Kotlin/Compose, Web-native HTML/CSS/JS
 
 ### AI Provider Abstraction
 ```rust
@@ -125,11 +114,11 @@ Each domain has:
 - **Services**: Domain logic that doesn't belong to entities
 - **Repositories**: Data access abstractions
 
-### Multi-Pane Writing System
-- Each pane corresponds to a Git branch
-- Content can be moved between panes via drag/drop
-- AI can suggest alternative approaches in new panes
-- Timeline visualizes writing journey across branches
+### Multi-Pane Writing System (MVP)
+- Multiple document editing panes for comparison
+- Content organization and project management
+- AI suggestions for alternative approaches
+- Future: Git integration and timeline visualization
 
 ## Development Commands
 
@@ -148,20 +137,17 @@ cargo test --workspace
 # Build Android app
 cd android && ./gradlew assembleDebug
 
-# Build iOS app
-cd ios && xcodebuild -scheme WriteMagic build
-
 # Run linting
 cargo clippy -- -D warnings
 ```
 
 ## Key Implementation Notes
 
-### Mobile Performance Priorities
-- Native UI components over cross-platform frameworks
+### Android Performance Priorities
+- Native Kotlin/Compose UI components
 - Optimize for memory usage and battery life
 - Implement proper background task management
-- Use platform-specific optimizations (iOS: Metal, Android: Vulkan)
+- Android-specific optimizations (Vulkan, hardware acceleration)
 
 ### AI Integration Best Practices
 - Always implement provider fallbacks
@@ -178,10 +164,36 @@ cargo clippy -- -D warnings
 
 ## Current Development Status
 
-Refer to `todo.md` for current sprint tasks and priorities. The project is in initial setup phase focusing on:
-1. Rust core foundation with workspace structure
-2. Mobile project setup with FFI integration
-3. AI provider abstraction design
-4. Basic CI/CD pipeline establishment
+**🚧 MVP IN DEVELOPMENT - ANDROID + WEB FOCUS**
 
-For detailed technical specifications, see `SPECS_IMPROVED.md`.
+WriteMagic is actively developing the MVP with a focused scope on Android mobile and web applications. 
+
+### 🎯 MVP Scope (Current Focus)
+1. **Rust Core Foundation**: Domain-driven architecture with SQLite/IndexedDB persistence
+2. **AI Integration**: Multi-provider orchestration (Claude/GPT-4) with intelligent fallback  
+3. **Android Application**: Native Kotlin/Compose app with FFI integration
+4. **Web Application**: Progressive Web App with WASM integration - **PROMOTED TO MVP**
+5. **Core Writing Features**: Document management, AI-assisted writing, multi-pane editing
+
+### 🔄 In Development
+- **Android FFI Integration**: Connecting Rust core to Android app
+- **Web WASM Integration**: Compiling Rust core to WebAssembly - **NEW MVP PRIORITY**
+- **Native Library Compilation**: Building .so files for Android and WASM for web
+- **Cross-platform UI**: Refining Android and web interfaces for writing workflows
+- **AI Service Integration**: Implementing provider fallback and caching across platforms
+
+### 📋 Post-MVP Roadmap
+Future development phases will include:
+- **iOS Application**: Native SwiftUI implementation - **DEMOTED TO PHASE 3**
+- **CI/CD Pipeline**: Automated deployment and infrastructure
+- **Advanced Features**: Git integration, collaborative editing, custom AI agents
+- **Cloud Infrastructure**: Kubernetes deployment and monitoring
+
+### ❌ Explicitly Out of MVP Scope
+- iOS application development - **DEMOTED TO PHASE 3**
+- CI/CD and infrastructure automation
+- Cloud deployment and monitoring
+- Advanced Git integration features
+
+For current development tasks and progress, see `todo.md`.
+- Primary directive: NEVER DO MOCK IMPLEMENTATIONS, ALWAYS FOCUS ON FUNCTIONAL IMPLEMENTATIONS.

@@ -5,7 +5,7 @@ use writemagic_shared::{ValueObject, Result, WritemagicError};
 use validator::Validate;
 
 /// AI prompt value object
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct Prompt {
     #[validate(length(min = 1, max = 100000))]
     pub content: String,
@@ -56,6 +56,9 @@ pub struct ModelConfiguration {
     #[validate(range(min = -2.0, max = 2.0))]
     pub presence_penalty: f32,
 }
+
+// Custom Eq implementation for f32 fields (needed for ValueObject trait)
+impl Eq for ModelConfiguration {}
 
 impl ModelConfiguration {
     pub fn new(model_name: impl Into<String>) -> Result<Self> {

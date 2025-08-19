@@ -1,0 +1,88 @@
+[package]
+name = "writemagic-web"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "writemagic-web"
+path = "src/main.rs"
+
+[dependencies]
+# Core workspace dependencies
+writemagic-shared = { path = "../core/shared" }
+writemagic-writing = { path = "../core/writing" }
+writemagic-ai = { path = "../core/ai" }
+writemagic-project = { path = "../core/project" }
+
+# Web Framework
+axum = { workspace = true }
+axum-extra = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+
+# Async Runtime
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+sea-orm = { workspace = true }
+sea-orm-migration = { workspace = true }
+writemagic-migration = { path = "../migration" }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error Handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging & Tracing
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Security & Auth
+argon2 = { workspace = true }
+jsonwebtoken = { workspace = true }
+uuid = { workspace = true }
+
+# Validation
+garde = { workspace = true }
+validator = { workspace = true }
+
+# Configuration
+config = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
+once_cell = { workspace = true }
+
+# HTTP Client
+reqwest = { workspace = true }
+
+# URL parsing
+url = { workspace = true }
+
+[dev-dependencies]
+# Testing framework
+tokio-test = "0.4"
+axum-test = { workspace = true }
+testcontainers = { workspace = true }
+testcontainers-modules = { workspace = true }
+tempfile = { workspace = true }
+
+# Property-based testing
+proptest = { workspace = true }
+
+# HTTP testing utilities
+hyper = { workspace = true }
+tower = { workspace = true, features = ["util"] }

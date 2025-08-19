@@ -2,15 +2,20 @@
 
 ## Executive Summary
 
-WriteMagic is a next-generation writing application that combines the organizational power of Scrivener with the intelligence of modern AI, wrapped in an intuitive, gesture-driven interface. The app serves fiction writers, journalists, content creators, and academics through a unified, magical writing experience.
+WriteMagic is an AI-powered writing application focused on **Android mobile** and **web platforms**. The MVP delivers core AI-assisted writing features through a Rust engine with functional implementations prioritized over mock code.
 
-### Core Innovation
+### Core Innovation (MVP Focus)
 
-- **Invisible Intelligence**: AI works continuously in the background without interrupting flow
-- **File-Based Sub-Agents**: Customizable YAML files provide specialized writing assistance
-- **Multi-Pane Creativity**: Parallel exploration of ideas with fluid content movement
-- **Magical Git Integration**: Beautiful timeline without technical complexity
-- **Universal Writing Support**: Adapts to any writing style or genre through contextual AI
+- **AI-Assisted Writing**: Contextual AI help for content generation and improvement
+- **Multi-Pane Editing**: Parallel content exploration and comparison
+- **Cross-Platform Experience**: Native Android/Compose + Progressive Web App
+- **Functional Core**: Production-ready Rust engine with FFI and WASM integration
+
+### Post-MVP Features
+- File-Based Sub-Agents (YAML configuration system)
+- Git Integration with timeline visualization
+- iOS application - **DEMOTED TO PHASE 3**
+- CI/CD pipeline and cloud infrastructure
 
 ## 1. System Architecture
 
@@ -18,11 +23,11 @@ WriteMagic is a next-generation writing application that combines the organizati
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Platform UI Layer                        │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │   Android   │  │     iOS     │  │    macOS    │         │
-│  │  (Compose)  │  │  (SwiftUI)  │  │  (SwiftUI)  │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│                    Platform UI Layer (MVP)                 │
+│  ┌─────────────┐  ┌─────────────┐                          │
+│  │   Android   │  │     Web     │                          │
+│  │  (Compose)  │  │   (WASM)    │ <- PROMOTED TO MVP       │
+│  └─────────────┘  └─────────────┘                          │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────────────────────────────────────┐
@@ -33,15 +38,15 @@ WriteMagic is a next-generation writing application that combines the organizati
 │  │ Domain          │  │ Domain          │                  │
 │  └─────────────────┘  └─────────────────┘                  │
 │                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐                  │
-│  │ Project Mgmt    │  │ Version Control │                  │
-│  │ Domain          │  │ Domain          │                  │
-│  └─────────────────┘  └─────────────────┘                  │
+│  ┌─────────────────┐                                        │
+│  │ Project Mgmt    │  [Version Control - Post-MVP]         │
+│  │ Domain          │                                        │
+│  └─────────────────┘                                        │
 │                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐                  │
-│  │ Sub-Agent       │  │ Infrastructure  │                  │
-│  │ System          │  │ Services        │                  │
-│  └─────────────────┘  └─────────────────┘                  │
+│  ┌─────────────────┐                                        │
+│  │ Infrastructure  │  [Sub-Agent System - Post-MVP]        │
+│  │ Services        │                                        │
+│  └─────────────────┘                                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -55,18 +60,18 @@ WriteMagic is a next-generation writing application that combines the organizati
 - Cross-platform FFI bindings
 - File system operations and watching
 
-**Android (Kotlin + Jetpack Compose)**
+**Android (Kotlin + Jetpack Compose)** - MVP
 
-- Native UI implementation
-- Gesture handling and animations
-- Platform-specific integrations
-- Background service management
+- Native UI implementation with Material Design 3
+- Gesture handling and writing-focused animations  
+- FFI integration with Rust core
+- Background task management for AI processing
 
-**iOS/macOS (Swift + SwiftUI)**
+**Web Application** - Post-MVP
 
-- Native UI implementation
-- Platform-specific optimizations
-- Shared Rust core integration
+- Modern web interface (React/Vue + WASM)
+- Cross-browser compatibility
+- Progressive Web App (PWA) capabilities
 
 **AI Integration**
 
@@ -624,140 +629,141 @@ impl AgentEngine {
 
 ## 5. Development Roadmap
 
-### 5.1 Phase 1: Foundation (Months 1-3)
+### 5.1 Phase 1: MVP Foundation (Current Focus)
 
-**Core Writing Experience**
+**Android + Rust Core MVP**
 
 **Deliverables**:
 
-- Rust core with basic document management
-- Android app with markdown editor
-- Text selection + AI magic button
-- Simple git integration with auto-commits
-- Basic project structure
+- Rust core with document management and AI integration
+- Android app with native Kotlin/Compose editor
+- Text selection + AI assistance
+- Multi-pane editing interface
+- SQLite persistence and document storage
 
 **Key Features**:
 
-- Document creation, editing, saving
-- Text selection with natural language AI instructions
-- Auto-save with git commits
-- File-based project structure
-- Basic metadata extraction
+- Document creation, editing, and saving
+- Text selection with natural language AI instructions  
+- Multi-pane content organization
+- Auto-save functionality
+- AI provider fallback (Claude/GPT-4)
 
 **Success Criteria**:
 
 - Writers can create and edit documents seamlessly
-- AI assistance works for basic text improvement
-- Git history is automatically maintained
-- App feels responsive and stable
+- AI assistance provides contextual help
+- Multi-pane editing enables content comparison
+- Android app meets Material Design 3 standards
+- Core functionality is production-ready
 
-### 5.2 Phase 2: Intelligence (Months 4-5)
+### 5.2 Phase 2: Web Application Development 
 
-**AI Integration and Background Processing**
-
-**Deliverables**:
-
-- Complete AI context system
-- Background metadata extraction
-- Basic sub-agent system
-- Scratchpad with AI organization
-- Writing type detection
-
-**Key Features**:
-
-- Contextual AI responses based on writing type
-- Automatic character/location extraction
-- AI-organized scratchpad
-- Built-in agents (metadata, commit composer)
-- Writing pattern recognition
-
-**Success Criteria**:
-
-- AI provides contextually appropriate suggestions
-- Metadata extraction works accurately across writing types
-- Scratchpad organization is genuinely helpful
-- Background processing doesn’t impact performance
-
-### 5.3 Phase 3: Multi-Pane System (Months 6-7)
-
-**Parallel Creative Thinking**
+**Cross-Platform Expansion**
 
 **Deliverables**:
 
-- Complete multi-pane implementation
-- Git branch per pane
-- Content movement between panes
-- Pane management UI
-- Timeline view
+- Web application with modern interface
+- WASM integration of Rust core
+- Progressive Web App (PWA) features
+- Cross-platform sync capabilities
+- Responsive design for all screen sizes
 
 **Key Features**:
 
-- Create AI rewrite, alternative, experiment panes
-- Drag/drop text between panes
-- Git branch management for panes
-- Beautiful timeline visualization
-- Pane merge capabilities
+- Feature parity with Android application
+- Browser-based document management
+- Real-time sync between Android and web
+- Offline capabilities with service workers
+- Cross-browser compatibility
 
 **Success Criteria**:
 
-- Writers use multiple panes for creative exploration
-- Content movement feels natural and intuitive
-- Git branching works transparently
-- Timeline tells a compelling story of the writing journey
+- Web app provides seamless writing experience
+- Sync works reliably between platforms
+- Performance matches native app standards
+- Works offline for core writing features
 
-### 5.4 Phase 4: Advanced Agents (Months 8-9)
+### 5.3 Phase 3: Advanced AI Features
 
-**Extensible Intelligence**
+**Enhanced Intelligence**
 
 **Deliverables**:
 
-- Complete sub-agent system
-- Agent configuration UI
-- Built-in agent library
-- Custom agent creation tools
-- Agent marketplace foundation
+- Advanced context awareness  
+- Writing style analysis and adaptation
+- Content suggestion improvements
+- Command palette for natural language actions
+- Tab completion with contextual suggestions
 
 **Key Features**:
 
-- Full YAML agent configuration
-- User-created custom agents
-- Agent sharing and discovery
-- Advanced triggering system
-- Agent performance monitoring
+- Natural language command processing
+- Intelligent text completion based on context
+- Writing style learning and matching
+- Advanced content analysis and suggestions
+- Personalized AI assistance
 
 **Success Criteria**:
 
-- Power users create valuable custom agents
-- Agent system feels extensible and powerful
-- Built-in agents cover most common needs
-- Agent execution is reliable and efficient
+- Command palette handles 90%+ of user requests accurately
+- Tab completion suggestions are contextually relevant
+- AI learns and adapts to individual writing styles
+- Advanced features improve writing productivity measurably
 
-### 5.5 Phase 5: Cross-Platform (Months 10-12)
+### 5.4 Phase 4: iOS Application (Post-MVP)
 
-**Universal Availability**
+**iOS Platform Expansion**
 
 **Deliverables**:
 
-- iOS app with shared Rust core
-- macOS app preparation
-- Cross-platform sync
-- Performance optimization
-- Beta testing program
+- Native SwiftUI iOS application
+- Feature parity with Android version
+- iOS-specific optimizations
+- Seamless sync across all platforms
+- App Store submission
 
 **Key Features**:
 
-- Feature parity across platforms
-- Seamless sync between devices
-- Platform-specific optimizations
-- Collaborative features
-- Export capabilities
+- Native iOS interface with Human Interface Guidelines compliance
+- Touch and gesture optimizations for iOS
+- Integration with iOS ecosystem (Shortcuts, etc.)
+- iCloud sync capabilities
+- iOS accessibility features
 
 **Success Criteria**:
 
-- Writers can switch seamlessly between devices
-- Platform-specific UI feels native
-- Sync is reliable and conflict-free
-- Performance meets platform standards
+- iOS app feels native and performant
+- Feature parity maintained across platforms
+- Successful App Store approval and launch
+- iOS-specific features enhance user experience
+
+### 5.5 Phase 5: Advanced Features & Automation
+
+**Extensibility and Intelligence**
+
+**Deliverables**:
+
+- File-based YAML agent system
+- Git integration with timeline visualization
+- CI/CD pipeline and infrastructure automation
+- Advanced collaboration features
+- Plugin and extensibility framework
+
+**Key Features**:
+
+- Customizable AI agents for specialized tasks
+- Beautiful git history timeline
+- Real-time collaborative editing
+- Automated deployment and monitoring
+- Third-party integration capabilities
+
+**Success Criteria**:
+
+- Agent system enables powerful customization
+- Git integration enhances version control workflows
+- Collaboration features support team writing
+- Infrastructure supports scale and reliability
 
 ## 6. Success Metrics
 

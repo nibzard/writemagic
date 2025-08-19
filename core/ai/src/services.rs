@@ -316,6 +316,7 @@ impl AIProviderRegistry {
 }
 
 /// Context management service
+#[derive(Clone)]
 pub struct ContextManagementService {
     max_context_length: usize,
 }

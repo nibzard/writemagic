@@ -23,7 +23,7 @@ async fn get_or_create_core_engine(claude_key: Option<String>, openai_key: Optio
             log::info!("Creating new CoreEngine instance for Android");
             
             let engine = ApplicationConfigBuilder::new()
-                .with_sqlite_in_memory()  // Use in-memory for mobile by default
+                .with_sqlite()  // Use persistent SQLite for mobile
                 .with_claude_key(claude_key.unwrap_or_else(|| "".to_string()))
                 .with_openai_key(openai_key.unwrap_or_else(|| "".to_string()))
                 .with_log_level("info".to_string())
@@ -61,8 +61,8 @@ fn init_logging() {
 
 /// Initialize the WriteMagic core engine with optional AI keys
 #[no_mangle]
-pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_initialize(
-    env: JNIEnv,
+pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeInitialize(
+    mut env: JNIEnv,
     _class: JClass,
     claude_key: JString,
     openai_key: JString,
@@ -74,7 +74,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_initialize(
     let claude_api_key = if claude_key.is_null() {
         None
     } else {
-        match env.get_string(claude_key) {
+        match env.get_string(&claude_key) {
             Ok(s) => {
                 let key: String = s.into();
                 if key.trim().is_empty() { None } else { Some(key) }
@@ -89,7 +89,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_initialize(
     let openai_api_key = if openai_key.is_null() {
         None
     } else {
-        match env.get_string(openai_key) {
+        match env.get_string(&openai_key) {
             Ok(s) => {
                 let key: String = s.into();
                 if key.trim().is_empty() { None } else { Some(key) }
@@ -127,8 +127,8 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_initialize(
 
 /// Create a new document
 #[no_mangle]
-pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createDocument(
-    env: JNIEnv,
+pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeCreateDocument(
+    mut env: JNIEnv,
     _class: JClass,
     title: JString,
     content: JString,
@@ -136,7 +136,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createDocument(
 ) -> jstring {
     init_logging();
     
-    let title: String = match env.get_string(title) {
+    let title: String = match env.get_string(&title) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get title string: {}", e);
@@ -144,7 +144,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createDocument(
         }
     };
     
-    let content: String = match env.get_string(content) {
+    let content: String = match env.get_string(&content) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get content string: {}", e);
@@ -152,7 +152,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createDocument(
         }
     };
     
-    let content_type_str: String = match env.get_string(content_type) {
+    let content_type_str: String = match env.get_string(&content_type) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get content_type string: {}", e);
@@ -203,7 +203,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createDocument(
         };
         
         engine_guard.runtime().block_on(async {
-            engine_guard.document_service().create_document(
+            engine_guard.document_management_service().create_document(
                 document_title,
                 document_content,
                 content_type,
@@ -244,15 +244,15 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createDocument(
 
 /// Update document content
 #[no_mangle]
-pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_updateDocumentContent(
-    env: JNIEnv,
+pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeUpdateDocumentContent(
+    mut env: JNIEnv,
     _class: JClass,
     document_id: JString,
     content: JString,
 ) -> jboolean {
     init_logging();
     
-    let document_id_str: String = match env.get_string(document_id) {
+    let document_id_str: String = match env.get_string(&document_id) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get document_id string: {}", e);
@@ -260,7 +260,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_updateDocumentCon
         }
     };
     
-    let content: String = match env.get_string(content) {
+    let content: String = match env.get_string(&content) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get content string: {}", e);
@@ -305,7 +305,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_updateDocumentCon
         };
         
         engine_guard.runtime().block_on(async {
-            engine_guard.document_service().update_document_content(
+            engine_guard.document_management_service().update_document_content(
                 document_id,
                 document_content,
                 None, // text selection
@@ -328,14 +328,14 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_updateDocumentCon
 
 /// Get document by ID
 #[no_mangle]
-pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_getDocument(
-    env: JNIEnv,
+pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeGetDocument(
+    mut env: JNIEnv,
     _class: JClass,
     document_id: JString,
 ) -> jstring {
     init_logging();
     
-    let document_id_str: String = match env.get_string(document_id) {
+    let document_id_str: String = match env.get_string(&document_id) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get document_id string: {}", e);
@@ -413,14 +413,14 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_getDocument(
 /// Create a new project
 #[no_mangle]
 pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createProject(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     name: JString,
     description: JString,
 ) -> jstring {
     init_logging();
     
-    let name: String = match env.get_string(name) {
+    let name: String = match env.get_string(&name) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get name string: {}", e);
@@ -428,7 +428,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createProject(
         }
     };
     
-    let description: String = match env.get_string(description) {
+    let description: String = match env.get_string(&description) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get description string: {}", e);
@@ -470,7 +470,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createProject(
         };
         
         engine_guard.runtime().block_on(async {
-            engine_guard.project_service().create_project(
+            engine_guard.project_management_service().create_project(
                 project_name,
                 project_description,
                 None, // created_by - would be set from authentication context
@@ -509,13 +509,13 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createProject(
 /// Get project by ID
 #[no_mangle]
 pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_getProject(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     project_id: JString,
 ) -> jstring {
     init_logging();
     
-    let project_id_str: String = match env.get_string(project_id) {
+    let project_id_str: String = match env.get_string(&project_id) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get project_id string: {}", e);
@@ -590,8 +590,8 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_getProject(
 
 /// List all documents with pagination
 #[no_mangle]
-pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_listDocuments(
-    env: JNIEnv,
+pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeListDocuments(
+    mut env: JNIEnv,
     _class: JClass,
     offset: jni::sys::jint,
     limit: jni::sys::jint,
@@ -670,15 +670,15 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_listDocuments(
 
 /// Complete text using AI with provider fallback
 #[no_mangle]
-pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_completeText(
-    env: JNIEnv,
+pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeCompleteText(
+    mut env: JNIEnv,
     _class: JClass,
     prompt: JString,
     model: JString,
 ) -> jstring {
     init_logging();
     
-    let prompt: String = match env.get_string(prompt) {
+    let prompt: String = match env.get_string(&prompt) {
         Ok(s) => s.into(),
         Err(e) => {
             log::error!("Failed to get prompt string: {}", e);
@@ -686,7 +686,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_completeText(
         }
     };
     
-    let model: Option<String> = match env.get_string(model) {
+    let model: Option<String> = match env.get_string(&model) {
         Ok(s) => {
             let model_str: String = s.into();
             if model_str.trim().is_empty() { None } else { Some(model_str) }

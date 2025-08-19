@@ -1,0 +1,22 @@
+[package]
+name = "writemagic-migration"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "migration"
+path = "src/lib.rs"
+
+[[bin]]
+name = "migration"
+path = "src/main.rs"
+
+[dependencies]
+sea-orm-migration = { workspace = true }
+async-std = { version = "1", features = ["attributes", "tokio1"] }
+
+[dev-dependencies]
