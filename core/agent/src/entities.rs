@@ -354,6 +354,57 @@ impl Agent {
         }
     }
     
+    /// Validate the workflow configuration
+    pub fn validate_workflow(&self, workflow: &AgentWorkflow) -> Result<()> {
+        // Basic validation
+        if workflow.name.trim().is_empty() {
+            return Err(WritemagicError::validation("Workflow name cannot be empty"));
+        }
+        
+        if workflow.version.trim().is_empty() {
+            return Err(WritemagicError::validation("Workflow version cannot be empty"));
+        }
+        
+        if workflow.triggers.is_empty() {
+            return Err(WritemagicError::validation("Workflow must have at least one trigger"));
+        }
+        
+        // Validate jobs
+        if workflow.jobs.len() > 50 {
+            return Err(WritemagicError::validation("Too many jobs in workflow"));
+        }
+        
+        // Validate variables
+        if workflow.variables.len() > 100 {
+            return Err(WritemagicError::validation("Too many variables in workflow"));
+        }
+        
+        // Validate each job
+        for (job_name, job) in &workflow.jobs {
+            if job_name.trim().is_empty() {
+                return Err(WritemagicError::validation("Job name cannot be empty"));
+            }
+            
+            if job.steps.len() > 20 {
+                return Err(WritemagicError::validation(&format!(
+                    "Too many steps in job '{}': {} (max: 20)", 
+                    job_name, 
+                    job.steps.len()
+                )));
+            }
+            
+            // Check for circular dependencies
+            if job.depends_on.contains(job_name) {
+                return Err(WritemagicError::validation(&format!(
+                    "Job '{}' cannot depend on itself",
+                    job_name
+                )));
+            }
+        }
+        
+        Ok(())
+    }
+    
     /// Check if the agent can be triggered by the given conditions
     pub fn can_trigger(&self, trigger_type: &TriggerType, context: &BTreeMap<String, serde_json::Value>) -> bool {
         if !self.is_active || self.state.status == AgentStatus::Disabled {

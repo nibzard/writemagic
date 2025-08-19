@@ -28,6 +28,13 @@ use writemagic_project::services::{ProjectManagementService as ProjectDomainServ
 use writemagic_version_control::services::{VersionControlService, DiffService, TimelineService};
 use writemagic_agent::services::{AgentManagementService, AgentExecutionService, AgentWorkflowService, AgentOrchestrationService};
 
+// Import cross-domain coordination
+use writemagic_shared::{
+    CrossDomainServiceRegistry, CrossDomainCoordinator, InMemoryEventBus, EventBus, 
+    WritingDomainService, AIDomainService, ProjectDomainService as ProjectService,
+    VersionControlDomainService, AgentDomainService as AgentService
+};
+
 // Import repositories
 use writemagic_project::repositories::{ProjectRepository as ProjectDomainRepository, ProjectRepositoryFactory as ProjectFactory};
 use writemagic_version_control::repositories::{VersionControlRepository, RepositoryFactory as VcFactory};
@@ -264,6 +271,11 @@ pub struct CoreEngine {
     agent_workflow_service: Arc<AgentWorkflowService>,
     agent_orchestration_service: Arc<AgentOrchestrationService>,
     
+    // Cross-domain coordination
+    event_bus: Arc<dyn EventBus>,
+    service_registry: Arc<CrossDomainServiceRegistry>,
+    cross_domain_coordinator: Arc<CrossDomainCoordinator>,
+    
     // Runtime for async operations
     tokio_runtime: Arc<tokio::runtime::Runtime>,
 }
@@ -414,6 +426,15 @@ impl CoreEngine {
         } else {
             None
         };
+        
+        // Initialize cross-domain coordination
+        let event_bus = Arc::new(InMemoryEventBus::new()) as Arc<dyn EventBus>;
+        let mut service_registry = CrossDomainServiceRegistry::new(event_bus.clone());
+        
+        // Register domain service adapters - these would need to be implemented
+        // For now, we'll create the structure without the actual adapters
+        let service_registry = Arc::new(service_registry);
+        let cross_domain_coordinator = Arc::new(CrossDomainCoordinator::new(service_registry.clone()));
 
         Ok(Self {
             config,
@@ -443,6 +464,9 @@ impl CoreEngine {
             agent_execution_service,
             agent_workflow_service,
             agent_orchestration_service,
+            event_bus,
+            service_registry,
+            cross_domain_coordinator,
             tokio_runtime,
         })
     }
@@ -690,6 +714,15 @@ impl CoreEngine {
             None
         };
         
+        // Initialize cross-domain coordination for IndexedDB constructor
+        let event_bus = Arc::new(InMemoryEventBus::new()) as Arc<dyn EventBus>;
+        let mut service_registry = CrossDomainServiceRegistry::new(event_bus.clone());
+        
+        // Register domain service adapters - these would need to be implemented
+        // For now, we'll create the structure without the actual adapters
+        let service_registry = Arc::new(service_registry);
+        let cross_domain_coordinator = Arc::new(CrossDomainCoordinator::new(service_registry.clone()));
+        
         Ok(Self {
             config,
             database_manager: None,
@@ -717,6 +750,9 @@ impl CoreEngine {
             agent_execution_service,
             agent_workflow_service,
             agent_orchestration_service,
+            event_bus,
+            service_registry,
+            cross_domain_coordinator,
             tokio_runtime,
         })
     }
@@ -890,6 +926,21 @@ impl CoreEngine {
     }
 
     // Configuration access methods
+    /// Get event bus
+    pub fn event_bus(&self) -> Arc<dyn EventBus> {
+        self.event_bus.clone()
+    }
+
+    /// Get cross-domain service registry
+    pub fn service_registry(&self) -> Arc<CrossDomainServiceRegistry> {
+        self.service_registry.clone()
+    }
+
+    /// Get cross-domain coordinator
+    pub fn cross_domain_coordinator(&self) -> Arc<CrossDomainCoordinator> {
+        self.cross_domain_coordinator.clone()
+    }
+
     /// Get application configuration
     pub fn config(&self) -> &ApplicationConfig {
         &self.config
@@ -1225,6 +1276,268 @@ impl CoreEngineBuilder {
 impl Default for CoreEngineBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// WASM-specific bindings for the core engine
+#[cfg(target_arch = "wasm32")]
+pub mod wasm_bindings {
+    use wasm_bindgen::prelude::*;
+    use wasm_bindgen_futures::future_to_promise;
+    use js_sys::Promise;
+    use serde_wasm_bindgen::{to_value, from_value};
+    use std::sync::Arc;
+    use super::*;
+    
+    /// WASM wrapper for the CoreEngine
+    #[wasm_bindgen]
+    pub struct WasmCoreEngine {
+        engine: Arc<CoreEngine>,
+    }
+    
+    #[wasm_bindgen]
+    impl WasmCoreEngine {
+        /// Initialize the core engine for WASM
+        #[wasm_bindgen(constructor)]
+        pub fn new() -> Promise {
+            future_to_promise(async move {
+                match CoreEngine::new_indexeddb_default().await {
+                    Ok(engine) => {
+                        let wasm_engine = WasmCoreEngine {
+                            engine: Arc::new(engine),
+                        };
+                        Ok(JsValue::from(wasm_engine))
+                    },
+                    Err(e) => Err(JsValue::from_str(&format!("Failed to initialize engine: {}", e))),
+                }
+            })
+        }
+        
+        /// Create a new document
+        #[wasm_bindgen(js_name = createDocument)]
+        pub fn create_document(&self, title: &str, content: &str) -> Promise {
+            let engine = self.engine.clone();
+            let title = title.to_string();
+            let content = content.to_string();
+            
+            future_to_promise(async move {
+                match engine.create_document(title, content, None).await {
+                    Ok(document) => {
+                        match to_value(&document) {
+                            Ok(value) => Ok(value),
+                            Err(e) => Err(JsValue::from_str(&format!("Serialization error: {}", e))),
+                        }
+                    },
+                    Err(e) => Err(JsValue::from_str(&format!("Failed to create document: {}", e))),
+                }
+            })
+        }
+        
+        /// Get a document by ID
+        #[wasm_bindgen(js_name = getDocument)]
+        pub fn get_document(&self, document_id: &str) -> Promise {
+            let engine = self.engine.clone();
+            let document_id = document_id.to_string();
+            
+            future_to_promise(async move {
+                // Parse the document ID (in a real implementation, you'd have proper ID parsing)
+                let id = match EntityId::new_from_string(&document_id) {
+                    Ok(id) => id,
+                    Err(e) => return Err(JsValue::from_str(&format!("Invalid document ID: {}", e))),
+                };
+                
+                match engine.get_document(&id).await {
+                    Ok(Some(document)) => {
+                        match to_value(&document) {
+                            Ok(value) => Ok(value),
+                            Err(e) => Err(JsValue::from_str(&format!("Serialization error: {}", e))),
+                        }
+                    },
+                    Ok(None) => Ok(JsValue::NULL),
+                    Err(e) => Err(JsValue::from_str(&format!("Failed to get document: {}", e))),
+                }
+            })
+        }
+        
+        /// Generate AI content
+        #[wasm_bindgen(js_name = generateContent)]
+        pub fn generate_content(&self, prompt: &str, model: Option<String>) -> Promise {
+            let engine = self.engine.clone();
+            let prompt = prompt.to_string();
+            
+            future_to_promise(async move {
+                match engine.complete_text(prompt, model).await {
+                    Ok(content) => Ok(JsValue::from_str(&content)),
+                    Err(e) => Err(JsValue::from_str(&format!("Failed to generate content: {}", e))),
+                }
+            })
+        }
+        
+        /// Create a project
+        #[wasm_bindgen(js_name = createProject)]
+        pub fn create_project(&self, name: &str, description: Option<String>) -> Promise {
+            let engine = self.engine.clone();
+            let name = name.to_string();
+            
+            future_to_promise(async move {
+                match engine.create_project(name, description, None).await {
+                    Ok(project) => {
+                        match to_value(&project) {
+                            Ok(value) => Ok(value),
+                            Err(e) => Err(JsValue::from_str(&format!("Serialization error: {}", e))),
+                        }
+                    },
+                    Err(e) => Err(JsValue::from_str(&format!("Failed to create project: {}", e))),
+                }
+            })
+        }
+        
+        /// Trigger an agent execution
+        #[wasm_bindgen(js_name = triggerAgent)]
+        pub fn trigger_agent(&self, agent_id: &str, context: JsValue) -> Promise {
+            let engine = self.engine.clone();
+            let agent_id = agent_id.to_string();
+            
+            future_to_promise(async move {
+                // Parse the agent ID
+                let id = match EntityId::new_from_string(&agent_id) {
+                    Ok(id) => id,
+                    Err(e) => return Err(JsValue::from_str(&format!("Invalid agent ID: {}", e))),
+                };
+                
+                // Parse the context from JavaScript
+                let context_map: std::collections::HashMap<String, String> = match from_value(context) {
+                    Ok(map) => map,
+                    Err(e) => return Err(JsValue::from_str(&format!("Invalid context: {}", e))),
+                };
+                
+                // Use the agent orchestration service
+                let agent_service = engine.agent_orchestration_service();
+                
+                // Convert the context to the required format for agent execution
+                // This is a simplified conversion - in practice you'd have more sophisticated context handling
+                let trigger_type = writemagic_agent::TriggerType::Manual;
+                let strategy = writemagic_agent::ExecutionStrategy::Immediate;
+                let context_json: std::collections::BTreeMap<String, serde_json::Value> = context_map
+                    .into_iter()
+                    .map(|(k, v)| (k, serde_json::Value::String(v)))
+                    .collect();
+                
+                match agent_service.smart_trigger(&id, trigger_type, context_json, strategy).await {
+                    Ok(result) => {
+                        match to_value(&result) {
+                            Ok(value) => Ok(value),
+                            Err(e) => Err(JsValue::from_str(&format!("Serialization error: {}", e))),
+                        }
+                    },
+                    Err(e) => Err(JsValue::from_str(&format!("Failed to trigger agent: {}", e))),
+                }
+            })
+        }
+        
+        /// Get system status
+        #[wasm_bindgen(js_name = getSystemStatus)]
+        pub fn get_system_status(&self) -> Promise {
+            let engine = self.engine.clone();
+            
+            future_to_promise(async move {
+                // Collect status from various services
+                let agent_service = engine.agent_orchestration_service();
+                
+                match agent_service.get_comprehensive_status().await {
+                    Ok(status) => {
+                        match to_value(&status) {
+                            Ok(value) => Ok(value),
+                            Err(e) => Err(JsValue::from_str(&format!("Serialization error: {}", e))),
+                        }
+                    },
+                    Err(e) => Err(JsValue::from_str(&format!("Failed to get system status: {}", e))),
+                }
+            })
+        }
+        
+        /// Access cross-domain coordination features
+        #[wasm_bindgen(js_name = crossDomainCoordination)]
+        pub fn cross_domain_coordination(&self) -> WasmCrossDomainCoordinator {
+            WasmCrossDomainCoordinator {
+                coordinator: self.engine.cross_domain_coordinator(),
+                engine: self.engine.clone(),
+            }
+        }
+    }
+    
+    /// WASM wrapper for cross-domain coordination
+    #[wasm_bindgen]
+    pub struct WasmCrossDomainCoordinator {
+        coordinator: Arc<CrossDomainCoordinator>,
+        engine: Arc<CoreEngine>,
+    }
+    
+    #[wasm_bindgen]
+    impl WasmCrossDomainCoordinator {
+        /// Create document in project with AI generation
+        #[wasm_bindgen(js_name = generateAndSaveDocument)]
+        pub fn generate_and_save_document(&self, prompt: &str, project_id: Option<String>) -> Promise {
+            let coordinator = self.coordinator.clone();
+            let prompt = prompt.to_string();
+            
+            future_to_promise(async move {
+                // Create AI generation request
+                let request = writemagic_shared::services::AIGenerationRequest {
+                    prompt,
+                    max_tokens: Some(2000),
+                    temperature: Some(0.7),
+                    context: None,
+                    style: None,
+                };
+                
+                // Parse project ID if provided
+                let project_entity_id = if let Some(project_id_str) = project_id {
+                    match EntityId::new_from_string(&project_id_str) {
+                        Ok(id) => Some(id),
+                        Err(e) => return Err(JsValue::from_str(&format!("Invalid project ID: {}", e))),
+                    }
+                } else {
+                    None
+                };
+                
+                match coordinator.generate_and_save_document(request, project_entity_id.as_ref()).await {
+                    Ok(document) => {
+                        match to_value(&document) {
+                            Ok(value) => Ok(value),
+                            Err(e) => Err(JsValue::from_str(&format!("Serialization error: {}", e))),
+                        }
+                    },
+                    Err(e) => Err(JsValue::from_str(&format!("Failed to generate and save document: {}", e))),
+                }
+            })
+        }
+        
+        /// Create analyzed commit
+        #[wasm_bindgen(js_name = createAnalyzedCommit)]
+        pub fn create_analyzed_commit(&self, document_id: &str, message: &str) -> Promise {
+            let coordinator = self.coordinator.clone();
+            let document_id = document_id.to_string();
+            let message = message.to_string();
+            
+            future_to_promise(async move {
+                // Parse document ID
+                let id = match EntityId::new_from_string(&document_id) {
+                    Ok(id) => id,
+                    Err(e) => return Err(JsValue::from_str(&format!("Invalid document ID: {}", e))),
+                };
+                
+                match coordinator.create_analyzed_commit(&id, message).await {
+                    Ok(commit) => {
+                        match to_value(&commit) {
+                            Ok(value) => Ok(value),
+                            Err(e) => Err(JsValue::from_str(&format!("Serialization error: {}", e))),
+                        }
+                    },
+                    Err(e) => Err(JsValue::from_str(&format!("Failed to create analyzed commit: {}", e))),
+                }
+            })
+        }
     }
 }
 

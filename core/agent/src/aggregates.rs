@@ -1,7 +1,7 @@
 //! Agent domain aggregates
 
 use writemagic_shared::{EntityId, WritemagicError, Result};
-use crate::entities::{Agent, AgentWorkflow, AgentState, AgentStatus, ExecutionContext, ExecutionResult, TriggerType};
+use crate::entities::{Agent, AgentWorkflow, AgentState, AgentStatus, ExecutionContext, ExecutionResult, TriggerType, WorkflowTrigger};
 use crate::value_objects::{ExecutionPriority, ExecutionMode, AgentVersion, ExecutionTimeout, ResourceQuota, PermissionLevel};
 use chrono::{DateTime, Utc, Duration};
 use serde::{Deserialize, Serialize};
@@ -333,10 +333,16 @@ impl AgentAggregate {
         self.agent.updated_at = Utc::now();
         self.version += 1;
         
+        let trigger = WorkflowTrigger {
+            trigger_type: execution.trigger_type.clone(),
+            conditions: vec![],
+            schedule: None,
+        };
+        
         let context = ExecutionContext {
             execution_id: execution.id,
             agent_id: self.agent.id,
-            trigger: execution.trigger_type.clone(),
+            trigger,
             variables: execution.context.clone(),
             started_at: Utc::now(),
             user_id: Some(self.agent.created_by),
