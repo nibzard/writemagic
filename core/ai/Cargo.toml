@@ -41,3 +41,17 @@ tracing.workspace = true
 # Additional dependencies
 dashmap = "5.5"
 futures = "0.3"
+
+# Tokenization
+tiktoken-rs = "0.5"
+ahash = "0.8"
+
+# Security and crypto
+zeroize = "1.7"
+constant_time_eq = "0.3"
+blake3 = "1.5"
+
+# Performance and monitoring
+metrics = "0.21"
+tracing-metrics = "0.2"
+parking_lot = "0.12"

@@ -74,11 +74,17 @@ case "$BUILD_MODE" in
             -- --features "console_error_panic_hook"
         ;;
     "release")
-        print_info "Building optimized release build..."
+        print_info "Building optimized release build with streaming compilation..."
         wasm-pack build \
             --target web \
             --out-dir "$OUTPUT_DIR" \
-            -- --features "console_error_panic_hook"
+            --no-typescript \
+            --mode force \
+            -- --features "console_error_panic_hook" --release
+        
+        # Apply additional optimizations
+        print_info "Applying advanced optimizations..."
+        optimize_wasm_bundle "$OUTPUT_DIR"
         ;;
     "profiling")
         print_info "Building profiling build with optimizations and debug info..."
@@ -93,6 +99,226 @@ case "$BUILD_MODE" in
         exit 1
         ;;
 esac
+
+# Add optimization function
+optimize_wasm_bundle() {
+    local output_dir="$1"
+    
+    print_info "Optimizing WASM bundle for streaming compilation..."
+    
+    # Check if wasm-opt is available for size optimization
+    if command -v wasm-opt &> /dev/null; then
+        print_info "Applying wasm-opt optimizations..."
+        
+        local wasm_file="$output_dir/writemagic_wasm_bg.wasm"
+        if [ -f "$wasm_file" ]; then
+            # Create backup
+            cp "$wasm_file" "$wasm_file.backup"
+            
+            # Apply aggressive optimizations
+            wasm-opt -Os --enable-mutable-globals --enable-bulk-memory \
+                --enable-sign-ext --enable-nontrapping-float-to-int \
+                --enable-multi-value "$wasm_file.backup" -o "$wasm_file"
+            
+            # Show size improvement
+            local old_size=$(du -h "$wasm_file.backup" | cut -f1)
+            local new_size=$(du -h "$wasm_file" | cut -f1)
+            print_success "WASM optimization complete: $old_size → $new_size"
+            
+            # Remove backup
+            rm "$wasm_file.backup"
+        fi
+    else
+        print_warning "wasm-opt not found, skipping advanced optimizations"
+    fi
+    
+    # Generate feature-split modules if needed
+    if [ "$BUILD_MODE" = "release" ]; then
+        generate_feature_modules "$output_dir"
+    fi
+    
+    # Generate streaming compilation helper
+    generate_streaming_loader "$output_dir"
+    
+    # Generate integrity checksums
+    generate_integrity_checksums "$output_dir"
+}
+
+# Generate feature-split modules for progressive loading
+generate_feature_modules() {
+    local output_dir="$1"
+    
+    print_info "Generating feature-split modules..."
+    
+    # This would involve more complex build logic to split WASM by features
+    # For now, we'll create module metadata for the loader
+    
+    cat > "$output_dir/module_manifest.json" << EOF
+{
+    "version": "1.0.0",
+    "modules": {
+        "core": {
+            "file": "writemagic_wasm_bg.wasm",
+            "features": ["document", "project", "ai_basic"],
+            "priority": "high",
+            "required": true
+        }
+    },
+    "buildTime": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)",
+    "optimizations": {
+        "wasmOpt": $(command -v wasm-opt &> /dev/null && echo "true" || echo "false"),
+        "streaming": true,
+        "compression": true
+    }
+}
+EOF
+    
+    print_success "Module manifest generated"
+}
+
+# Generate streaming compilation helper
+generate_streaming_loader() {
+    local output_dir="$1"
+    
+    print_info "Generating streaming compilation helper..."
+    
+    cat > "$output_dir/streaming_loader.js" << 'EOF'
+/**
+ * Streaming WASM Loader for WriteMagic
+ * Provides optimized WebAssembly loading with streaming compilation
+ */
+
+export class StreamingWasmLoader {
+    constructor(wasmUrl, jsBindingsUrl) {
+        this.wasmUrl = wasmUrl;
+        this.jsBindingsUrl = jsBindingsUrl;
+        this.compiledModule = null;
+        this.jsBindings = null;
+    }
+    
+    async load() {
+        const startTime = performance.now();
+        
+        try {
+            // Load JS bindings and WASM in parallel
+            const [jsBindings, wasmModule] = await Promise.all([
+                this.loadJSBindings(),
+                this.loadWasmWithStreaming()
+            ]);
+            
+            this.jsBindings = jsBindings;
+            this.compiledModule = wasmModule;
+            
+            const loadTime = performance.now() - startTime;
+            console.log(`[StreamingWasmLoader] Loaded in ${loadTime.toFixed(2)}ms`);
+            
+            return {
+                wasmModule,
+                jsBindings,
+                loadTime
+            };
+            
+        } catch (error) {
+            console.error('[StreamingWasmLoader] Loading failed:', error);
+            throw error;
+        }
+    }
+    
+    async loadJSBindings() {
+        const response = await fetch(this.jsBindingsUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to load JS bindings: ${response.statusText}`);
+        }
+        
+        // Dynamic import of the JS bindings
+        const module = await import(this.jsBindingsUrl);
+        return module;
+    }
+    
+    async loadWasmWithStreaming() {
+        if (typeof WebAssembly.compileStreaming === 'function') {
+            try {
+                return await WebAssembly.compileStreaming(fetch(this.wasmUrl));
+            } catch (error) {
+                console.warn('[StreamingWasmLoader] Streaming compilation failed, falling back:', error);
+            }
+        }
+        
+        // Fallback to traditional loading
+        const response = await fetch(this.wasmUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch WASM: ${response.statusText}`);
+        }
+        
+        const wasmBytes = await response.arrayBuffer();
+        return await WebAssembly.compile(wasmBytes);
+    }
+    
+    async instantiate() {
+        if (!this.compiledModule) {
+            throw new Error('WASM module not loaded. Call load() first.');
+        }
+        
+        const instance = await WebAssembly.instantiate(this.compiledModule);
+        
+        // Initialize JS bindings with the instance
+        if (this.jsBindings && this.jsBindings.default) {
+            await this.jsBindings.default(instance);
+        }
+        
+        return {
+            instance,
+            exports: instance.exports,
+            jsBindings: this.jsBindings
+        };
+    }
+}
+
+// Default export for convenience
+export default StreamingWasmLoader;
+EOF
+    
+    print_success "Streaming loader helper generated"
+}
+
+# Generate integrity checksums for security
+generate_integrity_checksums() {
+    local output_dir="$1"
+    
+    print_info "Generating integrity checksums..."
+    
+    local checksums_file="$output_dir/integrity.json"
+    echo "{" > "$checksums_file"
+    echo '  "version": "1.0.0",' >> "$checksums_file"
+    echo '  "generated": "'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'",' >> "$checksums_file"
+    echo '  "checksums": {' >> "$checksums_file"
+    
+    local first=true
+    for file in "$output_dir"/*.wasm "$output_dir"/*.js; do
+        if [ -f "$file" ]; then
+            local filename=$(basename "$file")
+            local checksum=$(shasum -a 256 "$file" | cut -d' ' -f1)
+            local size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
+            
+            if [ "$first" = true ]; then
+                first=false
+            else
+                echo "," >> "$checksums_file"
+            fi
+            
+            echo -n "    \"$filename\": {" >> "$checksums_file"
+            echo -n "\"sha256\": \"$checksum\", " >> "$checksums_file"
+            echo -n "\"size\": $size" >> "$checksums_file"
+            echo -n "}" >> "$checksums_file"
+        fi
+    done
+    
+    echo "" >> "$checksums_file"
+    echo "  }" >> "$checksums_file"
+    echo "}" >> "$checksums_file"
+    
+    print_success "Integrity checksums generated"
+}
 
 # Check if build was successful
 if [ -d "$OUTPUT_DIR" ] && [ -f "$OUTPUT_DIR/writemagic_wasm.js" ]; then

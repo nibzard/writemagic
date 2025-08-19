@@ -7,6 +7,9 @@
 import WriteMagic, { WriteMagicEvents } from '../src/js/index.js';
 import ServiceWorkerManager from '../src/js/utils/service-worker-manager.js';
 import NetworkIndicator from '../src/js/utils/network-indicator.js';
+import WasmLoader from '../src/js/utils/wasm-loader.js';
+import ProgressiveLoader from '../src/js/utils/progressive-loader.js';
+import PerformanceMonitor from '../src/js/utils/performance-monitor.js';
 
 /**
  * WriteMagic Web Application Class
@@ -26,6 +29,15 @@ class WriteMagicApp {
         this.serviceWorkerManager = null;
         this.networkIndicator = null;
         this.isOfflineMode = false;
+        
+        // Performance optimization components
+        this.wasmLoader = null;
+        this.progressiveLoader = null;
+        this.performanceMonitor = null;
+        
+        // PWA installation
+        this.installPromptEvent = null;
+        this.isInstallable = false;
         
         // UI Elements
         this.elements = {};
@@ -71,11 +83,20 @@ class WriteMagicApp {
             // Setup event listeners
             this.setupEventListeners();
             
-            // Initialize WriteMagic core
-            await this.initializeWriteMagic();
+            // Initialize performance monitoring first
+            await this.initializePerformanceMonitoring();
+            
+            // Initialize progressive loading system
+            await this.initializeProgressiveLoading();
+            
+            // Initialize WriteMagic core with WASM optimization
+            await this.initializeWriteMagicWithOptimizations();
             
             // Initialize Service Worker and offline capabilities
             await this.initializeServiceWorker();
+            
+            // Initialize PWA features
+            await this.initializePWAFeatures();
             
             // Setup UI
             this.setupUI();
@@ -189,9 +210,144 @@ class WriteMagicApp {
     }
 
     /**
-     * Initialize WriteMagic core engine
+     * Initialize performance monitoring system
      */
-    async initializeWriteMagic() {
+    async initializePerformanceMonitoring() {
+        this.updateLoadingStatus('Initializing performance monitoring...');
+        
+        try {
+            this.performanceMonitor = new PerformanceMonitor({
+                enableRealTimeMonitoring: true,
+                enableAutoOptimization: true,
+                enableRegressionDetection: true,
+                enableUserExperienceTracking: true,
+                monitoringInterval: 5000
+            });
+            
+            // Set up performance event listeners
+            this.performanceMonitor.on('alertCreated', (alert) => {
+                if (alert.level === 'critical') {
+                    this.showError(`Performance Alert: ${alert.title}`);
+                } else if (alert.level === 'warning') {
+                    this.showNotification(`Performance: ${alert.title}`, 'warning');
+                }
+            });
+            
+            this.performanceMonitor.on('optimizationExecuted', (data) => {
+                if (data.success) {
+                    console.log(`[App] Performance optimization applied: ${data.optimization.type}`);
+                }
+            });
+            
+            console.log('[App] Performance monitoring initialized');
+            
+        } catch (error) {
+            console.error('[App] Performance monitoring initialization failed:', error);
+            // Continue without performance monitoring
+        }
+    }
+
+    /**
+     * Initialize progressive loading system
+     */
+    async initializeProgressiveLoading() {
+        this.updateLoadingStatus('Setting up progressive loading...');
+        
+        try {
+            this.progressiveLoader = new ProgressiveLoader({
+                enableIntelligentPreloading: true,
+                enableUserBehaviorLearning: true,
+                enablePerformanceOptimization: true,
+                maxConcurrentRequests: 6
+            });
+            
+            // Set up progressive loading event listeners
+            this.progressiveLoader.on('loadingStarted', (data) => {
+                console.log('[App] Progressive loading started:', data);
+            });
+            
+            this.progressiveLoader.on('progressUpdated', (data) => {
+                this.updateLoadingProgress(data.loadingState);
+            });
+            
+            this.progressiveLoader.on('loadingCompleted', (data) => {
+                console.log(`[App] Progressive loading completed in ${data.loadTime.toFixed(2)}ms`);
+            });
+            
+            this.progressiveLoader.on('preloadingCompleted', (data) => {
+                console.log('[App] Intelligent preloading completed:', data);
+            });
+            
+            console.log('[App] Progressive loading system initialized');
+            
+        } catch (error) {
+            console.error('[App] Progressive loading initialization failed:', error);
+            // Continue with standard loading
+        }
+    }
+
+    /**
+     * Initialize WriteMagic with WASM optimizations
+     */
+    async initializeWriteMagicWithOptimizations() {
+        this.updateLoadingStatus('Loading optimized WriteMagic engine...');
+        
+        try {
+            // Use progressive loader for optimized initialization
+            if (this.progressiveLoader) {
+                const requiredFeatures = [
+                    'document', 'project', 'ai_basic'
+                ];
+                
+                const userContext = {
+                    userType: 'writer',
+                    currentTime: new Date().toISOString(),
+                    previousSession: localStorage.getItem('writemagic-last-session')
+                };
+                
+                const result = await this.progressiveLoader.startProgressiveLoading(
+                    requiredFeatures, 
+                    userContext
+                );
+                
+                // Initialize WriteMagic with optimized WASM modules
+                const config = {
+                    auto_save_delay: 2000,
+                    enable_analytics: true,
+                    enable_focus_mode: true,
+                    default_layout: 'focus',
+                    enable_keyboard_navigation: true,
+                    enable_accessibility: true,
+                    wasm_modules: result.wasmModules
+                };
+                
+                this.writeMagic = new WriteMagic(config);
+                
+            } else {
+                // Fallback to standard initialization
+                await this.initializeWriteMagicStandard();
+            }
+            
+            this.setupWriteMagicEventHandlers();
+            
+            // Wait for full initialization
+            while (!this.writeMagic.isInitialized) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            console.log('[App] WriteMagic initialized with optimizations');
+            
+        } catch (error) {
+            console.error('[App] Optimized WriteMagic initialization failed:', error);
+            // Fallback to standard initialization
+            await this.initializeWriteMagicStandard();
+        }
+    }
+
+    /**
+     * Standard WriteMagic initialization (fallback)
+     */
+    async initializeWriteMagicStandard() {
         this.updateLoadingStatus('Loading WriteMagic engine...');
         
         const config = {
@@ -204,7 +360,12 @@ class WriteMagicApp {
         };
         
         this.writeMagic = new WriteMagic(config);
-        
+    }
+
+    /**
+     * Setup WriteMagic event handlers
+     */
+    setupWriteMagicEventHandlers() {
         // Setup WriteMagic event listeners
         this.writeMagic.on(WriteMagicEvents.INITIALIZED, () => {
             console.log('WriteMagic core initialized');
@@ -228,11 +389,244 @@ class WriteMagicApp {
         this.writeMagic.on(WriteMagicEvents.ERROR, (data) => {
             this.showError(data.error.message);
         });
+    }
+
+    /**
+     * Initialize PWA features with optimized installation
+     */
+    async initializePWAFeatures() {
+        this.updateLoadingStatus('Setting up PWA features...');
         
-        // Wait for full initialization
-        while (!this.writeMagic.isInitialized) {
-            await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+            // Listen for install prompt
+            window.addEventListener('beforeinstallprompt', (e) => {
+                console.log('[App] PWA install prompt available');
+                e.preventDefault();
+                this.installPromptEvent = e;
+                this.isInstallable = true;
+                this.showInstallPrompt();
+            });
+            
+            // Listen for app installed event
+            window.addEventListener('appinstalled', () => {
+                console.log('[App] PWA was installed');
+                this.installPromptEvent = null;
+                this.isInstallable = false;
+                this.hideInstallPrompt();
+                this.showNotification('WriteMagic installed successfully!', 'success', 3000);
+                
+                // Track installation for analytics
+                if (this.performanceMonitor) {
+                    this.performanceMonitor.trackUserAction('pwa_installed');
+                }
+            });
+            
+            // Check if already installed
+            if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+                console.log('[App] Running as installed PWA');
+                document.body.classList.add('pwa-installed');
+            }
+            
+            // Set up PWA-specific optimizations
+            this.optimizePWAPerformance();
+            
+            console.log('[App] PWA features initialized');
+            
+        } catch (error) {
+            console.error('[App] PWA features initialization failed:', error);
         }
+    }
+
+    /**
+     * Show PWA install prompt
+     */
+    showInstallPrompt() {
+        // Check if user previously dismissed the prompt
+        const dismissedTime = localStorage.getItem('writemagic-install-dismissed');
+        if (dismissedTime) {
+            const dismissedDate = new Date(parseInt(dismissedTime));
+            const daysSinceDismissed = (Date.now() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24);
+            
+            if (daysSinceDismissed < 7) {
+                console.log('[App] Install prompt dismissed recently, not showing');
+                return;
+            }
+        }
+        
+        // Create enhanced install prompt
+        const installPrompt = document.createElement('div');
+        installPrompt.id = 'pwa-install-prompt';
+        installPrompt.className = 'install-prompt';
+        installPrompt.innerHTML = `
+            <h4>📱 Install WriteMagic</h4>
+            <p>Install WriteMagic for the best writing experience with offline support and faster loading.</p>
+            <div class="install-actions">
+                <button class="install-btn" id="install-accept">Install</button>
+                <button class="dismiss-btn" id="install-dismiss">Maybe Later</button>
+            </div>
+        `;
+        
+        document.body.appendChild(installPrompt);
+        
+        // Add event listeners
+        document.getElementById('install-accept')?.addEventListener('click', () => {
+            this.installPWA();
+        });
+        
+        document.getElementById('install-dismiss')?.addEventListener('click', () => {
+            this.dismissInstallPrompt();
+        });
+        
+        // Auto-dismiss after 15 seconds
+        setTimeout(() => {
+            if (document.getElementById('pwa-install-prompt')) {
+                this.dismissInstallPrompt();
+            }
+        }, 15000);
+        
+        console.log('[App] Install prompt shown');
+    }
+
+    /**
+     * Install PWA
+     */
+    async installPWA() {
+        if (!this.installPromptEvent) {
+            console.warn('[App] No install prompt event available');
+            return;
+        }
+        
+        try {
+            // Show the install prompt
+            const result = await this.installPromptEvent.prompt();
+            
+            console.log('[App] Install prompt result:', result.outcome);
+            
+            if (result.outcome === 'accepted') {
+                console.log('[App] User accepted the install prompt');
+            } else {
+                console.log('[App] User dismissed the install prompt');
+                localStorage.setItem('writemagic-install-dismissed', Date.now().toString());
+            }
+            
+        } catch (error) {
+            console.error('[App] PWA installation failed:', error);
+        } finally {
+            this.hideInstallPrompt();
+        }
+    }
+
+    /**
+     * Dismiss install prompt
+     */
+    dismissInstallPrompt() {
+        localStorage.setItem('writemagic-install-dismissed', Date.now().toString());
+        this.hideInstallPrompt();
+    }
+
+    /**
+     * Hide install prompt
+     */
+    hideInstallPrompt() {
+        const prompt = document.getElementById('pwa-install-prompt');
+        if (prompt) {
+            prompt.remove();
+        }
+    }
+
+    /**
+     * Optimize PWA performance
+     */
+    optimizePWAPerformance() {
+        // Preload critical resources for PWA
+        const criticalResources = [
+            '/styles/critical.css',
+            '/scripts/core.js',
+            '/core/wasm/pkg/writemagic_wasm_bg.wasm'
+        ];
+        
+        for (const resource of criticalResources) {
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            
+            if (resource.endsWith('.css')) {
+                link.as = 'style';
+            } else if (resource.endsWith('.js')) {
+                link.as = 'script';
+            } else if (resource.endsWith('.wasm')) {
+                link.as = 'fetch';
+                link.crossOrigin = 'anonymous';
+            }
+            
+            link.href = resource;
+            document.head.appendChild(link);
+        }
+        
+        // Optimize for PWA display mode
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            // Add PWA-specific optimizations
+            document.body.classList.add('pwa-standalone');
+            
+            // Disable pull-to-refresh on mobile
+            document.body.style.overscrollBehavior = 'none';
+            
+            // Optimize viewport for PWA
+            const viewport = document.querySelector('meta[name="viewport"]');
+            if (viewport) {
+                viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+            }
+        }
+    }
+
+    /**
+     * Update loading progress with detailed information
+     */
+    updateLoadingProgress(loadingState) {
+        if (!loadingState) return;
+        
+        const progressBar = document.querySelector('.loading-bar');
+        const statusText = document.querySelector('.loading-status');
+        
+        if (progressBar) {
+            const progress = Math.max(loadingState.overallProgress || 0, 0);
+            progressBar.style.transform = `scaleX(${progress / 100})`;
+        }
+        
+        if (statusText) {
+            let statusMessage = 'Loading...';
+            
+            if (loadingState.currentPhase) {
+                const phaseNames = {
+                    'initialization': 'Initializing application...',
+                    'core_assets': 'Loading core assets...',
+                    'wasm_compilation': 'Compiling WebAssembly modules...',
+                    'feature_modules': 'Loading feature modules...',
+                    'finalization': 'Finalizing setup...'
+                };
+                
+                statusMessage = phaseNames[loadingState.currentPhase] || `${loadingState.currentPhase}...`;
+            }
+            
+            if (loadingState.estimatedTimeRemaining > 0) {
+                const secondsRemaining = Math.ceil(loadingState.estimatedTimeRemaining / 1000);
+                statusMessage += ` (${secondsRemaining}s remaining)`;
+            }
+            
+            statusText.textContent = statusMessage;
+        }
+        
+        // Update progress in title for background tabs
+        if (loadingState.overallProgress) {
+            document.title = `(${Math.round(loadingState.overallProgress)}%) WriteMagic - Loading...`;
+        }
+    }
+
+    /**
+     * Initialize WriteMagic core engine (original method name preserved)
+     */
+    async initializeWriteMagic() {
+        // This method is kept for compatibility but delegates to the new optimized version
+        return await this.initializeWriteMagicWithOptimizations();
     }
 
     /**

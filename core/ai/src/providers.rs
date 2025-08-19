@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use writemagic_shared::{Result, WritemagicError};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
 use dashmap::DashMap;
@@ -130,7 +131,7 @@ impl Message {
 }
 
 /// Message role enumeration
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageRole {
     System,
@@ -189,6 +190,58 @@ pub struct UsageStats {
     pub cost_today: f64,
 }
 
+/// Thread-safe usage statistics with atomic operations
+#[derive(Debug)]
+pub struct AtomicUsageStats {
+    pub total_requests: AtomicU64,
+    pub total_tokens: AtomicU64,
+    pub total_cost: RwLock<f64>,
+    pub requests_today: AtomicU64,
+    pub tokens_today: AtomicU64,
+    pub cost_today: RwLock<f64>,
+}
+
+impl AtomicUsageStats {
+    pub fn new() -> Self {
+        Self {
+            total_requests: AtomicU64::new(0),
+            total_tokens: AtomicU64::new(0),
+            total_cost: RwLock::new(0.0),
+            requests_today: AtomicU64::new(0),
+            tokens_today: AtomicU64::new(0),
+            cost_today: RwLock::new(0.0),
+        }
+    }
+
+    pub async fn increment_request(&self, tokens: u64, cost: f64) {
+        self.total_requests.fetch_add(1, Ordering::Relaxed);
+        self.total_tokens.fetch_add(tokens, Ordering::Relaxed);
+        self.requests_today.fetch_add(1, Ordering::Relaxed);
+        self.tokens_today.fetch_add(tokens, Ordering::Relaxed);
+
+        // Update costs atomically
+        {
+            let mut total_cost = self.total_cost.write().await;
+            *total_cost += cost;
+        }
+        {
+            let mut cost_today = self.cost_today.write().await;
+            *cost_today += cost;
+        }
+    }
+
+    pub async fn to_usage_stats(&self) -> UsageStats {
+        UsageStats {
+            total_requests: self.total_requests.load(Ordering::Relaxed),
+            total_tokens: self.total_tokens.load(Ordering::Relaxed),
+            total_cost: *self.total_cost.read().await,
+            requests_today: self.requests_today.load(Ordering::Relaxed),
+            tokens_today: self.tokens_today.load(Ordering::Relaxed),
+            cost_today: *self.cost_today.read().await,
+        }
+    }
+}
+
 /// Claude AI provider implementation
 pub struct ClaudeProvider {
     api_key: String,
@@ -196,29 +249,24 @@ pub struct ClaudeProvider {
     client: reqwest::Client,
     rate_limiter: Arc<RateLimiter>,
     cache: Arc<ResponseCache>,
-    usage_stats: Arc<RwLock<UsageStats>>,
+    usage_stats: Arc<AtomicUsageStats>,
 }
 
 impl ClaudeProvider {
-    pub fn new(api_key: String) -> Self {
-        Self {
+    pub fn new(api_key: String) -> Result<Self> {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(120))
+            .build()
+            .map_err(|e| WritemagicError::configuration(format!("Failed to create HTTP client: {}", e)))?;
+
+        Ok(Self {
             api_key,
             base_url: "https://api.anthropic.com".to_string(),
-            client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(120))
-                .build()
-                .expect("Failed to create HTTP client"),
+            client,
             rate_limiter: Arc::new(RateLimiter::new(5, 200)), // 5 concurrent, 200ms min interval
             cache: Arc::new(ResponseCache::new(300)), // 5 minute cache
-            usage_stats: Arc::new(RwLock::new(UsageStats {
-                total_requests: 0,
-                total_tokens: 0,
-                total_cost: 0.0,
-                requests_today: 0,
-                tokens_today: 0,
-                cost_today: 0.0,
-            })),
-        }
+            usage_stats: Arc::new(AtomicUsageStats::new()),
+        })
     }
 
     pub fn with_base_url(mut self, base_url: String) -> Self {
@@ -252,7 +300,7 @@ impl AIProvider for ClaudeProvider {
         }
 
         // Rate limiting
-        let _permit = self.rate_limiter.acquire().await;
+        let _permit = self.rate_limiter.acquire().await?;
 
         let url = format!("{}/v1/messages", self.base_url);
         
@@ -336,27 +384,20 @@ impl AIProvider for ClaudeProvider {
     }
 
     async fn get_usage_stats(&self) -> Result<UsageStats> {
-        let stats = self.usage_stats.read().await;
-        Ok(stats.clone())
+        Ok(self.usage_stats.to_usage_stats().await)
     }
 }
 
 impl ClaudeProvider {
     async fn update_usage_stats(&self, response: &CompletionResponse, _duration: Duration) {
-        let mut stats = self.usage_stats.write().await;
-        stats.total_requests += 1;
-        stats.total_tokens += response.usage.total_tokens as u64;
-        stats.requests_today += 1;
-        stats.tokens_today += response.usage.total_tokens as u64;
-        
         // Calculate cost based on model capabilities
         let capabilities = self.capabilities();
         let input_cost = response.usage.prompt_tokens as f64 * capabilities.input_cost_per_token;
         let output_cost = response.usage.completion_tokens as f64 * capabilities.output_cost_per_token;
         let total_cost = input_cost + output_cost;
         
-        stats.total_cost += total_cost;
-        stats.cost_today += total_cost;
+        // Atomically update all statistics
+        self.usage_stats.increment_request(response.usage.total_tokens as u64, total_cost).await;
     }
 
     fn convert_to_claude_format(&self, request: &CompletionRequest) -> Result<serde_json::Value> {
@@ -446,29 +487,24 @@ pub struct OpenAIProvider {
     client: reqwest::Client,
     rate_limiter: Arc<RateLimiter>,
     cache: Arc<ResponseCache>,
-    usage_stats: Arc<RwLock<UsageStats>>,
+    usage_stats: Arc<AtomicUsageStats>,
 }
 
 impl OpenAIProvider {
-    pub fn new(api_key: String) -> Self {
-        Self {
+    pub fn new(api_key: String) -> Result<Self> {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(120))
+            .build()
+            .map_err(|e| WritemagicError::configuration(format!("Failed to create HTTP client: {}", e)))?;
+
+        Ok(Self {
             api_key,
             base_url: "https://api.openai.com".to_string(),
-            client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(120))
-                .build()
-                .expect("Failed to create HTTP client"),
+            client,
             rate_limiter: Arc::new(RateLimiter::new(10, 100)), // 10 concurrent, 100ms min interval
             cache: Arc::new(ResponseCache::new(300)), // 5 minute cache
-            usage_stats: Arc::new(RwLock::new(UsageStats {
-                total_requests: 0,
-                total_tokens: 0,
-                total_cost: 0.0,
-                requests_today: 0,
-                tokens_today: 0,
-                cost_today: 0.0,
-            })),
-        }
+            usage_stats: Arc::new(AtomicUsageStats::new()),
+        })
     }
 
     pub fn with_base_url(mut self, base_url: String) -> Self {
@@ -502,7 +538,7 @@ impl AIProvider for OpenAIProvider {
         }
 
         // Rate limiting
-        let _permit = self.rate_limiter.acquire().await;
+        let _permit = self.rate_limiter.acquire().await?;
 
         let url = format!("{}/v1/chat/completions", self.base_url);
         
@@ -580,27 +616,20 @@ impl AIProvider for OpenAIProvider {
     }
 
     async fn get_usage_stats(&self) -> Result<UsageStats> {
-        let stats = self.usage_stats.read().await;
-        Ok(stats.clone())
+        Ok(self.usage_stats.to_usage_stats().await)
     }
 }
 
 impl OpenAIProvider {
     async fn update_usage_stats(&self, response: &CompletionResponse, _duration: Duration) {
-        let mut stats = self.usage_stats.write().await;
-        stats.total_requests += 1;
-        stats.total_tokens += response.usage.total_tokens as u64;
-        stats.requests_today += 1;
-        stats.tokens_today += response.usage.total_tokens as u64;
-        
         // Calculate cost based on model capabilities
         let capabilities = self.capabilities();
         let input_cost = response.usage.prompt_tokens as f64 * capabilities.input_cost_per_token;
         let output_cost = response.usage.completion_tokens as f64 * capabilities.output_cost_per_token;
         let total_cost = input_cost + output_cost;
         
-        stats.total_cost += total_cost;
-        stats.cost_today += total_cost;
+        // Atomically update all statistics
+        self.usage_stats.increment_request(response.usage.total_tokens as u64, total_cost).await;
     }
 
     fn convert_to_openai_format(&self, request: &CompletionRequest) -> serde_json::Value {
@@ -635,8 +664,9 @@ impl RateLimiter {
         }
     }
 
-    pub async fn acquire(&self) -> tokio::sync::SemaphorePermit<'_> {
-        let permit = self.semaphore.acquire().await.unwrap();
+    pub async fn acquire(&self) -> Result<tokio::sync::SemaphorePermit<'_>, WritemagicError> {
+        let permit = self.semaphore.acquire().await
+            .map_err(|_| WritemagicError::network("Rate limiter semaphore closed".to_string()))?;
         
         // Enforce minimum interval between requests
         let mut last = self.last_request.write().await;
@@ -648,7 +678,7 @@ impl RateLimiter {
         }
         *self.last_request.write().await = Instant::now();
         
-        permit
+        Ok(permit)
     }
 }
 

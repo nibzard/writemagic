@@ -16,6 +16,35 @@ pub struct DocumentAggregate {
 }
 
 impl DocumentAggregate {
+    /// Check if aggregate version conflicts with expected version
+    pub fn check_version_conflict(&self, expected_version: u64) -> Result<()> {
+        if self.document.version != expected_version {
+            return Err(WritemagicError::version_conflict(
+                format!("Document version conflict: expected {}, found {}", 
+                        expected_version, self.document.version)
+            ));
+        }
+        Ok(())
+    }
+
+    /// Reload aggregate from current document state, preserving uncommitted events
+    pub fn reload_from_repository(&mut self, fresh_document: Document) -> Result<()> {
+        if fresh_document.id != self.document.id {
+            return Err(WritemagicError::validation("Document ID mismatch during reload"));
+        }
+        
+        // Preserve uncommitted events
+        let uncommitted = std::mem::take(&mut self.uncommitted_events);
+        
+        // Update document state
+        self.document = fresh_document;
+        
+        // Restore uncommitted events
+        self.uncommitted_events = uncommitted;
+        
+        Ok(())
+    }
+
     pub fn new(title: DocumentTitle, content: DocumentContent, content_type: ContentType, created_by: Option<EntityId>) -> Self {
         let document = Document::new(title.value.clone(), content.value.clone(), content_type.clone(), created_by);
         let event = DocumentEvent::DocumentCreated {
@@ -132,7 +161,8 @@ impl DocumentAggregate {
         let event = DocumentEvent::DocumentDeleted {
             document_id: self.document.id,
             deleted_by,
-            deleted_at: self.document.deleted_at.clone().unwrap(),
+            deleted_at: self.document.deleted_at.clone()
+                .ok_or_else(|| WritemagicError::validation("Document deleted_at timestamp missing"))?,
         };
 
         self.uncommitted_events.push(event);
@@ -190,6 +220,37 @@ pub struct ProjectAggregate {
 }
 
 impl ProjectAggregate {
+    /// Check if aggregate version conflicts with expected version
+    pub fn check_version_conflict(&self, expected_version: u64) -> Result<()> {
+        if self.project.version != expected_version {
+            return Err(WritemagicError::version_conflict(
+                format!("Project version conflict: expected {}, found {}", 
+                        expected_version, self.project.version)
+            ));
+        }
+        Ok(())
+    }
+
+    /// Reload aggregate from current project state, preserving uncommitted events
+    pub fn reload_from_repository(&mut self, fresh_project: Project) -> Result<()> {
+        if fresh_project.id != self.project.id {
+            return Err(WritemagicError::validation("Project ID mismatch during reload"));
+        }
+        
+        // Preserve uncommitted events and metadata
+        let uncommitted = std::mem::take(&mut self.uncommitted_events);
+        let metadata = std::mem::take(&mut self.document_metadata);
+        
+        // Update project state
+        self.project = fresh_project;
+        
+        // Restore uncommitted events and metadata
+        self.uncommitted_events = uncommitted;
+        self.document_metadata = metadata;
+        
+        Ok(())
+    }
+
     pub fn new(name: ProjectName, description: Option<String>, created_by: Option<EntityId>) -> Self {
         let project = Project::new(name.value.clone(), description.clone(), created_by);
         let event = ProjectEvent::ProjectCreated {
@@ -264,7 +325,7 @@ impl ProjectAggregate {
         let event = ProjectEvent::DocumentRemoved {
             project_id: self.project.id,
             document_id: *document_id,
-            document_title: document_metadata.map(|m| m.title).unwrap_or_default(),
+            document_title: document_metadata.map(|m| m.title).unwrap_or_else(|| "Unknown Document".to_string()),
             removed_by: updated_by,
             removed_at: self.project.updated_at.clone(),
         };

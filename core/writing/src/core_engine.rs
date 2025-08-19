@@ -23,6 +23,16 @@ use writemagic_ai::{
     AIWritingService,
 };
 
+// Import domain services
+use writemagic_project::services::{ProjectManagementService as ProjectDomainService, ProjectTemplateService, ProjectAnalyticsService};
+use writemagic_version_control::services::{VersionControlService, DiffService, TimelineService};
+use writemagic_agent::services::{AgentManagementService, AgentExecutionService, AgentWorkflowService, AgentOrchestrationService};
+
+// Import repositories
+use writemagic_project::repositories::{ProjectRepository as ProjectDomainRepository, ProjectRepositoryFactory as ProjectFactory};
+use writemagic_version_control::repositories::{VersionControlRepository, RepositoryFactory as VcFactory};
+use writemagic_agent::repositories::{AgentRepository, AgentRepositoryFactory};
+
 /// Application configuration for the entire WriteMagic stack
 #[derive(Debug, Clone)]
 pub struct ApplicationConfig {
@@ -221,9 +231,14 @@ pub struct CoreEngine {
     #[cfg(target_arch = "wasm32")]
     indexeddb_manager: Option<Arc<tokio::sync::Mutex<IndexedDbManager>>>,
     
-    // Repository implementations
+    // Repository implementations - Writing domain
     document_repository: Arc<dyn DocumentRepository>,
     project_repository: Arc<dyn ProjectRepository>,
+    
+    // Repository implementations - New domains
+    project_domain_repository: Arc<dyn ProjectDomainRepository>,
+    version_control_repository: Arc<dyn VersionControlRepository>,
+    agent_repository: Arc<dyn AgentRepository>,
     
     // AI services
     ai_orchestration_service: Option<AIOrchestrationService>,
@@ -231,11 +246,23 @@ pub struct CoreEngine {
     content_filtering_service: Option<ContentFilteringService>,
     ai_writing_service: Option<AIWritingService>,
     
-    // Domain services
+    // Writing domain services
     document_management_service: Arc<DocumentManagementService>,
     project_management_service: Arc<ProjectManagementService>,
     content_analysis_service: Arc<ContentAnalysisService>,
     integrated_writing_service: Option<Arc<IntegratedWritingService>>,
+    
+    // New domain services
+    project_domain_service: Arc<ProjectDomainService>,
+    project_template_service: Arc<ProjectTemplateService>,
+    project_analytics_service: Arc<ProjectAnalyticsService>,
+    version_control_service: Arc<VersionControlService>,
+    diff_service: Arc<DiffService>,
+    timeline_service: Arc<TimelineService>,
+    agent_management_service: Arc<AgentManagementService>,
+    agent_execution_service: Arc<AgentExecutionService>,
+    agent_workflow_service: Arc<AgentWorkflowService>,
+    agent_orchestration_service: Arc<AgentOrchestrationService>,
     
     // Runtime for async operations
     tokio_runtime: Arc<tokio::runtime::Runtime>,
@@ -253,13 +280,16 @@ impl CoreEngine {
         );
 
         // Initialize storage based on configuration
-        let (database_manager, document_repository, project_repository) = match config.storage.storage_type {
+        let (database_manager, document_repository, project_repository, project_domain_repository, version_control_repository, agent_repository) = match config.storage.storage_type {
             StorageType::InMemory => {
                 log::info!("Using in-memory storage");
                 (
                     None,
                     Arc::new(InMemoryDocumentRepository::new()) as Arc<dyn DocumentRepository>,
                     Arc::new(InMemoryProjectRepository::new()) as Arc<dyn ProjectRepository>,
+                    ProjectFactory::create_repository(),
+                    VcFactory::create_repository(),
+                    AgentRepositoryFactory::create_agent_repository(),
                 )
             },
             StorageType::SQLite => {
@@ -272,6 +302,9 @@ impl CoreEngine {
                         None,
                         Arc::new(InMemoryDocumentRepository::new()) as Arc<dyn DocumentRepository>,
                         Arc::new(InMemoryProjectRepository::new()) as Arc<dyn ProjectRepository>,
+                        ProjectFactory::create_repository(),
+                        VcFactory::create_repository(),
+                        AgentRepositoryFactory::create_agent_repository(),
                     )
                 } else {
                     log::info!("Using SQLite storage at: {}", db_config.database_url);
@@ -281,6 +314,9 @@ impl CoreEngine {
                         Some(database_manager),
                         Arc::new(SqliteDocumentRepository::new(pool.clone())) as Arc<dyn DocumentRepository>,
                         Arc::new(SqliteProjectRepository::new(pool)) as Arc<dyn ProjectRepository>,
+                        ProjectFactory::create_repository(),
+                        VcFactory::create_repository(),
+                        AgentRepositoryFactory::create_agent_repository(),
                     )
                 }
             },
@@ -319,6 +355,50 @@ impl CoreEngine {
             document_repository.clone(),
         ));
         let content_analysis_service = Arc::new(ContentAnalysisService::new());
+        
+        // Initialize new domain services
+        let project_domain_service = Arc::new(ProjectDomainService::new(
+            project_domain_repository.clone(),
+        ));
+        let project_template_service = Arc::new(ProjectTemplateService::new(
+            project_domain_repository.clone(),
+        ));
+        let project_analytics_service = Arc::new(ProjectAnalyticsService::new(
+            project_domain_repository.clone(),
+        ));
+        let version_control_service = Arc::new(VersionControlService::new(
+            version_control_repository.clone(),
+        ));
+        let diff_service = Arc::new(DiffService::new());
+        let timeline_service = Arc::new(TimelineService::new(
+            version_control_repository.clone(),
+        ));
+        
+        // Initialize agent services
+        let agent_workflow_repository = AgentRepositoryFactory::create_workflow_repository();
+        let agent_execution_repository = AgentRepositoryFactory::create_execution_repository();
+        
+        let agent_management_service = Arc::new(AgentManagementService::new(
+            agent_repository.clone(),
+            agent_workflow_repository.clone(),
+            agent_execution_repository.clone(),
+        ));
+        
+        let running_agents = Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
+        
+        let agent_execution_service = Arc::new(AgentExecutionService::new(
+            agent_repository.clone(),
+            agent_execution_repository.clone(),
+            running_agents.clone(),
+        ));
+        let agent_workflow_service = Arc::new(AgentWorkflowService::new(
+            agent_workflow_repository.clone(),
+        ));
+        let agent_orchestration_service = Arc::new(AgentOrchestrationService::new(
+            agent_management_service.clone(),
+            agent_execution_service.clone(),
+            agent_workflow_service.clone(),
+        ));
 
         // Initialize integrated writing service if AI is available
         let integrated_writing_service = if let Some(ai_writing) = &ai_writing_service {
@@ -342,6 +422,9 @@ impl CoreEngine {
             indexeddb_manager: None,
             document_repository,
             project_repository,
+            project_domain_repository,
+            version_control_repository,
+            agent_repository,
             ai_orchestration_service,
             context_management_service,
             content_filtering_service,
@@ -350,6 +433,16 @@ impl CoreEngine {
             project_management_service,
             content_analysis_service,
             integrated_writing_service,
+            project_domain_service,
+            project_template_service,
+            project_analytics_service,
+            version_control_service,
+            diff_service,
+            timeline_service,
+            agent_management_service,
+            agent_execution_service,
+            agent_workflow_service,
+            agent_orchestration_service,
             tokio_runtime,
         })
     }
@@ -503,6 +596,11 @@ impl CoreEngine {
         let document_repository = Arc::new(IndexedDbDocumentRepository::new(indexeddb_manager.clone())) as Arc<dyn DocumentRepository>;
         let project_repository = Arc::new(IndexedDbProjectRepository::new(indexeddb_manager.clone())) as Arc<dyn ProjectRepository>;
         
+        // Create new domain repositories (using factory pattern for cross-platform compatibility)
+        let project_domain_repository = ProjectFactory::create_repository();
+        let version_control_repository = VcFactory::create_repository();
+        let agent_repository = AgentRepositoryFactory::create_agent_repository();
+        
         log::info!("IndexedDB repositories initialized");
         
         // Initialize AI services
@@ -533,6 +631,50 @@ impl CoreEngine {
         ));
         let content_analysis_service = Arc::new(ContentAnalysisService::new());
         
+        // Initialize new domain services
+        let project_domain_service = Arc::new(ProjectDomainService::new(
+            project_domain_repository.clone(),
+        ));
+        let project_template_service = Arc::new(ProjectTemplateService::new(
+            project_domain_repository.clone(),
+        ));
+        let project_analytics_service = Arc::new(ProjectAnalyticsService::new(
+            project_domain_repository.clone(),
+        ));
+        let version_control_service = Arc::new(VersionControlService::new(
+            version_control_repository.clone(),
+        ));
+        let diff_service = Arc::new(DiffService::new());
+        let timeline_service = Arc::new(TimelineService::new(
+            version_control_repository.clone(),
+        ));
+        
+        // Initialize agent services
+        let agent_workflow_repository = AgentRepositoryFactory::create_workflow_repository();
+        let agent_execution_repository = AgentRepositoryFactory::create_execution_repository();
+        
+        let agent_management_service = Arc::new(AgentManagementService::new(
+            agent_repository.clone(),
+            agent_workflow_repository.clone(),
+            agent_execution_repository.clone(),
+        ));
+        
+        let running_agents = Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
+        
+        let agent_execution_service = Arc::new(AgentExecutionService::new(
+            agent_repository.clone(),
+            agent_execution_repository.clone(),
+            running_agents.clone(),
+        ));
+        let agent_workflow_service = Arc::new(AgentWorkflowService::new(
+            agent_workflow_repository.clone(),
+        ));
+        let agent_orchestration_service = Arc::new(AgentOrchestrationService::new(
+            agent_management_service.clone(),
+            agent_execution_service.clone(),
+            agent_workflow_service.clone(),
+        ));
+        
         // Initialize integrated writing service if AI is available
         let integrated_writing_service = if let Some(ai_writing) = &ai_writing_service {
             let integrated = IntegratedWritingServiceBuilder::new()
@@ -554,6 +696,9 @@ impl CoreEngine {
             indexeddb_manager: Some(indexeddb_manager),
             document_repository,
             project_repository,
+            project_domain_repository,
+            version_control_repository,
+            agent_repository,
             ai_orchestration_service,
             context_management_service,
             content_filtering_service,
@@ -562,6 +707,16 @@ impl CoreEngine {
             project_management_service,
             content_analysis_service,
             integrated_writing_service,
+            project_domain_service,
+            project_template_service,
+            project_analytics_service,
+            version_control_service,
+            diff_service,
+            timeline_service,
+            agent_management_service,
+            agent_execution_service,
+            agent_workflow_service,
+            agent_orchestration_service,
             tokio_runtime,
         })
     }
@@ -665,6 +820,73 @@ impl CoreEngine {
     /// Get integrated writing service
     pub fn integrated_writing_service(&self) -> Option<Arc<IntegratedWritingService>> {
         self.integrated_writing_service.clone()
+    }
+
+    // New domain service access methods
+    /// Get project domain service (advanced project management)
+    pub fn project_domain_service(&self) -> Arc<ProjectDomainService> {
+        self.project_domain_service.clone()
+    }
+
+    /// Get project template service
+    pub fn project_template_service(&self) -> Arc<ProjectTemplateService> {
+        self.project_template_service.clone()
+    }
+
+    /// Get project analytics service
+    pub fn project_analytics_service(&self) -> Arc<ProjectAnalyticsService> {
+        self.project_analytics_service.clone()
+    }
+
+    /// Get version control service
+    pub fn version_control_service(&self) -> Arc<VersionControlService> {
+        self.version_control_service.clone()
+    }
+
+    /// Get diff service
+    pub fn diff_service(&self) -> Arc<DiffService> {
+        self.diff_service.clone()
+    }
+
+    /// Get timeline service
+    pub fn timeline_service(&self) -> Arc<TimelineService> {
+        self.timeline_service.clone()
+    }
+
+    /// Get agent management service
+    pub fn agent_management_service(&self) -> Arc<AgentManagementService> {
+        self.agent_management_service.clone()
+    }
+
+    /// Get agent execution service
+    pub fn agent_execution_service(&self) -> Arc<AgentExecutionService> {
+        self.agent_execution_service.clone()
+    }
+
+    /// Get agent workflow service
+    pub fn agent_workflow_service(&self) -> Arc<AgentWorkflowService> {
+        self.agent_workflow_service.clone()
+    }
+
+    /// Get agent orchestration service
+    pub fn agent_orchestration_service(&self) -> Arc<AgentOrchestrationService> {
+        self.agent_orchestration_service.clone()
+    }
+
+    // New domain repository access methods
+    /// Get project domain repository
+    pub fn project_domain_repository(&self) -> Arc<dyn ProjectDomainRepository> {
+        self.project_domain_repository.clone()
+    }
+
+    /// Get version control repository
+    pub fn version_control_repository(&self) -> Arc<dyn VersionControlRepository> {
+        self.version_control_repository.clone()
+    }
+
+    /// Get agent repository
+    pub fn agent_repository(&self) -> Arc<dyn AgentRepository> {
+        self.agent_repository.clone()
     }
 
     // Configuration access methods

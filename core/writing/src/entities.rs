@@ -52,10 +52,16 @@ impl Document {
 
     pub fn update_content(&mut self, content: String, updated_by: Option<EntityId>) {
         if self.content != content {
-            self.content = content.clone();
-            self.content_hash = ContentHash::new(&content);
-            self.word_count = Self::count_words(&content);
-            self.character_count = content.len() as u32;
+            // Calculate metrics before moving content
+            let content_hash = ContentHash::new(&content);
+            let word_count = Self::count_words(&content);
+            let character_count = content.len() as u32;
+            
+            // Move content to avoid clone
+            self.content = content;
+            self.content_hash = content_hash;
+            self.word_count = word_count;
+            self.character_count = character_count;
             self.updated_at = Timestamp::now();
             self.updated_by = updated_by;
             self.increment_version();

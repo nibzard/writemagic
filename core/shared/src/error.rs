@@ -107,6 +107,9 @@ pub enum WritemagicError {
 
     #[error("Rate limit exceeded: {limit} requests per {window_seconds}s")]
     RateLimited { limit: u32, window_seconds: u32 },
+
+    #[error("Version conflict: {message}")]
+    VersionConflict { message: String },
 }
 
 /// Result type alias for WriteMagic operations
@@ -198,6 +201,36 @@ impl WritemagicError {
         Self::RateLimited { limit, window_seconds }
     }
 
+    pub fn version_conflict(message: impl Into<String>) -> Self {
+        Self::VersionConflict {
+            message: message.into(),
+        }
+    }
+
+    /// Get error message for debugging and testing
+    pub fn message(&self) -> String {
+        match self {
+            Self::Validation { message } => message.clone(),
+            Self::Repository { message } => message.clone(),
+            Self::AiProvider { message } => message.clone(),
+            Self::Git { message } => message.clone(),
+            Self::Database { message } => message.clone(),
+            Self::Authentication { message } => message.clone(),
+            Self::Configuration { message } => message.clone(),
+            Self::Network { message } => message.clone(),
+            Self::Internal { message, .. } => message.clone(),
+            Self::NotFound { resource } => resource.clone(),
+            Self::VersionConflict { message } => message.clone(),
+            Self::Io { source } => source.to_string(),
+            Self::Serialization { source } => source.to_string(),
+            Self::Timeout { timeout_ms } => format!("Request timeout after {}ms", timeout_ms),
+            Self::Cancelled => "Operation cancelled".to_string(),
+            Self::RateLimited { limit, window_seconds } => {
+                format!("Rate limit exceeded: {} requests per {}s", limit, window_seconds)
+            },
+        }
+    }
+
     /// Convert to structured error response
     pub fn to_error_response(&self, request_id: Option<String>) -> ErrorResponse {
         let (code, details) = match self {
@@ -218,6 +251,7 @@ impl WritemagicError {
                 ErrorCode::ServiceUnavailable, 
                 None
             ),
+            Self::VersionConflict { .. } => (ErrorCode::Conflict, None),
             _ => (ErrorCode::InternalError, None),
         };
 

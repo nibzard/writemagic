@@ -33,9 +33,9 @@ impl DocumentManagementService {
         // Save to repository
         let document = self.document_repository.save(aggregate.document()).await?;
         
-        // Update aggregate with saved document
-        // TODO: Fix aggregate loading
-        // *aggregate = DocumentAggregate::load_from_document(document);
+        // Reload aggregate with updated document to ensure consistency
+        let updated_aggregate = DocumentAggregate::load_from_document(document);
+        aggregate = updated_aggregate;
         aggregate.mark_events_as_committed();
 
         Ok(aggregate)
@@ -61,9 +61,9 @@ impl DocumentManagementService {
         // Save changes
         let updated_document = self.document_repository.save(aggregate.document()).await?;
         
-        // Update aggregate with saved document
-        // TODO: Fix aggregate loading
-        // *aggregate = DocumentAggregate::load_from_document(updated_document);
+        // Reload aggregate to ensure version consistency and prevent conflicts
+        let reloaded_aggregate = DocumentAggregate::load_from_document(updated_document);
+        aggregate = reloaded_aggregate;
         aggregate.mark_events_as_committed();
 
         Ok(aggregate)
@@ -108,9 +108,9 @@ impl DocumentManagementService {
         // Save changes
         let updated_document = self.document_repository.save(aggregate.document()).await?;
         
-        // Update aggregate with saved document
-        // TODO: Fix aggregate loading
-        // *aggregate = DocumentAggregate::load_from_document(updated_document);
+        // Reload aggregate to ensure version consistency and prevent conflicts
+        let reloaded_aggregate = DocumentAggregate::load_from_document(updated_document);
+        aggregate = reloaded_aggregate;
         aggregate.mark_events_as_committed();
 
         Ok(aggregate)
@@ -146,9 +146,9 @@ impl ProjectManagementService {
         // Save to repository
         let project = self.project_repository.save(aggregate.project()).await?;
         
-        // Update aggregate with saved project
-        // TODO: Fix aggregate loading
-        // *aggregate = ProjectAggregate::load_from_project(project);
+        // Reload aggregate with updated project to ensure consistency
+        let updated_aggregate = ProjectAggregate::load_from_project(project);
+        aggregate = updated_aggregate;
         aggregate.mark_events_as_committed();
 
         Ok(aggregate)
@@ -179,9 +179,9 @@ impl ProjectManagementService {
         // Save changes
         let updated_project = self.project_repository.save(aggregate.project()).await?;
         
-        // Update aggregate with saved project
-        // TODO: Fix aggregate loading
-        // *aggregate = ProjectAggregate::load_from_project(updated_project);
+        // Reload aggregate to ensure version consistency and prevent conflicts
+        let reloaded_aggregate = ProjectAggregate::load_from_project(updated_project);
+        aggregate = reloaded_aggregate;
         aggregate.mark_events_as_committed();
 
         Ok(aggregate)
@@ -206,9 +206,9 @@ impl ProjectManagementService {
         // Save changes
         let updated_project = self.project_repository.save(aggregate.project()).await?;
         
-        // Update aggregate with saved project
-        // TODO: Fix aggregate loading
-        // *aggregate = ProjectAggregate::load_from_project(updated_project);
+        // Reload aggregate to ensure version consistency and prevent conflicts
+        let reloaded_aggregate = ProjectAggregate::load_from_project(updated_project);
+        aggregate = reloaded_aggregate;
         aggregate.mark_events_as_committed();
 
         Ok(aggregate)
@@ -233,9 +233,9 @@ impl ProjectManagementService {
         // Save changes
         let updated_project = self.project_repository.save(aggregate.project()).await?;
         
-        // Update aggregate with saved project
-        // TODO: Fix aggregate loading
-        // *aggregate = ProjectAggregate::load_from_project(updated_project);
+        // Reload aggregate to ensure version consistency and prevent conflicts
+        let reloaded_aggregate = ProjectAggregate::load_from_project(updated_project);
+        aggregate = reloaded_aggregate;
         aggregate.mark_events_as_committed();
 
         Ok(aggregate)
