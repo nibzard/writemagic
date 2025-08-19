@@ -10,6 +10,7 @@ members = [
     "ffi/android",
     "ffi/ios",
     "web",
+    "core/wasm",
     "migration",
 ]
 
@@ -133,6 +134,30 @@ ring = "0.17"
 # iOS specific
 libc = "0.2"
 
+# WASM specific
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "console",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "Window",
+    "Storage",
+    "Location",
+    "History",
+    "Response",
+    "Request",
+    "Headers",
+    "FormData",
+    "Blob",
+    "File",
+    "FileReader",
+] }
+console_error_panic_hook = "0.1"
+getrandom = { version = "0.2", features = ["js"] }
+
 # Use workspace.lints for consistent linting across all crates
 [workspace.lints.rust]
 unsafe_code = "warn"
@@ -181,6 +206,19 @@ codegen-units = 1       # Single codegen unit
 panic = "abort"         # No unwinding
 strip = true            # Strip symbols
 
+# WASM-specific profiles
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"         # Optimize for size (WASM)
+lto = true              # Link-time optimization
+panic = "abort"         # No unwinding for WASM
+overflow-checks = false # Disable overflow checks for performance
+
+[profile.wasm-dev]
+inherits = "dev"
+panic = "abort"         # No unwinding for WASM
+overflow-checks = true  # Keep overflow checks in dev
+
 
 # Cross-compilation targets
 [workspace.metadata.cross]
@@ -201,3 +239,6 @@ dockerfile = "docker/Dockerfile.ios"
 
 [workspace.metadata.cross.target.x86_64-apple-ios]
 dockerfile = "docker/Dockerfile.ios"
+
+[workspace.metadata.cross.target.wasm32-unknown-unknown]
+dockerfile = "docker/Dockerfile.wasm"

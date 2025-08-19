@@ -1,0 +1,172 @@
+{
+  "name": "WriteMagic - AI-Powered Writing App",
+  "short_name": "WriteMagic",
+  "description": "Professional AI-powered writing application for content creators, authors, and writers",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "utilities", "education"],
+  "lang": "en",
+  
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96", 
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+
+  "shortcuts": [
+    {
+      "name": "New Document",
+      "short_name": "New Doc",
+      "description": "Create a new document",
+      "url": "/?action=new-document",
+      "icons": [
+        {
+          "src": "/icons/shortcut-new-document.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Focus Session",
+      "short_name": "Focus",
+      "description": "Start a focus writing session",
+      "url": "/?action=focus-session",
+      "icons": [
+        {
+          "src": "/icons/shortcut-focus.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Writing Analytics",
+      "short_name": "Analytics",
+      "description": "View your writing progress",
+      "url": "/?action=analytics",
+      "icons": [
+        {
+          "src": "/icons/shortcut-analytics.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-main.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Main writing interface on desktop"
+    },
+    {
+      "src": "/screenshots/mobile-editor.png", 
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile writing editor"
+    },
+    {
+      "src": "/screenshots/ai-assistant.png",
+      "sizes": "1280x720", 
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "AI writing assistant interface"
+    }
+  ],
+
+  "related_applications": [],
+  "prefer_related_applications": false,
+
+  "protocol_handlers": [
+    {
+      "protocol": "web+writemagic",
+      "url": "/open?document=%s"
+    }
+  ],
+
+  "file_handlers": [
+    {
+      "action": "/open",
+      "accept": {
+        "text/plain": [".txt"],
+        "text/markdown": [".md", ".markdown"],
+        "application/rtf": [".rtf"]
+      }
+    }
+  ],
+
+  "share_target": {
+    "action": "/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
+}

@@ -1,0 +1,661 @@
+/**
+ * WriteMagic Responsive Styles
+ * 
+ * Mobile-first responsive design for all screen sizes and orientations
+ */
+
+/* ==================== MOBILE FIRST BASE ==================== */
+
+/* Base mobile styles (already defined in other CSS files) */
+
+/* ==================== SMALL MOBILE (320px+) ==================== */
+
+@media (min-width: 320px) {
+    .writing-editor {
+        font-size: calc(var(--editor-font-size) * 0.95);
+        line-height: 1.5;
+        padding: var(--space-3);
+    }
+    
+    .session-type-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-2);
+    }
+    
+    .analytics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-2);
+    }
+}
+
+/* ==================== MOBILE LANDSCAPE & LARGE MOBILE (480px+) ==================== */
+
+@media (min-width: 480px) {
+    .writing-editor {
+        font-size: var(--editor-font-size);
+        padding: var(--space-4);
+    }
+    
+    .header-center {
+        display: flex;
+        max-width: 20rem;
+    }
+    
+    .session-type-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-3);
+    }
+    
+    .analytics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-3);
+    }
+    
+    .modal-content {
+        margin: var(--space-6);
+    }
+}
+
+/* ==================== TABLET PORTRAIT (640px+) ==================== */
+
+@media (min-width: 640px) {
+    :root {
+        --header-height: 3.5rem;
+        --sidebar-width: 18rem;
+    }
+    
+    .writing-editor {
+        padding: var(--space-5);
+        font-size: calc(var(--editor-font-size) * 1.05);
+    }
+    
+    .project-sidebar {
+        position: relative;
+        transform: none;
+        z-index: auto;
+        box-shadow: none;
+    }
+    
+    .sidebar-toggle {
+        display: none;
+    }
+    
+    .workspace-panes {
+        flex-direction: row;
+    }
+    
+    .pane {
+        border-right: var(--pane-border-width) solid var(--color-border);
+        border-bottom: none;
+    }
+    
+    .pane:last-child {
+        border-right: none;
+    }
+    
+    .header-center {
+        max-width: 25rem;
+    }
+    
+    .writing-stats {
+        display: flex;
+    }
+    
+    .session-type-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .analytics-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    /* Two-pane layouts become viable */
+    .workspace-panes.layout-split .pane.editor-pane {
+        flex: 0 0 60%;
+    }
+    
+    .workspace-panes.layout-split .pane.ai-pane {
+        flex: 0 0 40%;
+        display: flex;
+    }
+}
+
+/* ==================== TABLET LANDSCAPE (768px+) ==================== */
+
+@media (min-width: 768px) {
+    :root {
+        --sidebar-width: 16rem;
+        --editor-padding: 1.5rem;
+    }
+    
+    .writing-editor {
+        padding: var(--editor-padding);
+        max-width: none;
+    }
+    
+    .focus-mode .writing-editor {
+        max-width: var(--editor-max-width);
+        margin: 0 auto;
+        padding: var(--space-8) var(--space-6);
+    }
+    
+    .header-center {
+        max-width: 30rem;
+    }
+    
+    .layout-toolbar {
+        padding: 0 var(--space-6);
+    }
+    
+    /* Three-pane layouts become viable */
+    .workspace-panes.layout-research .pane.editor-pane {
+        flex: 0 0 45%;
+    }
+    
+    .workspace-panes.layout-research .pane.notes-pane {
+        flex: 0 0 27.5%;
+        display: flex;
+    }
+    
+    .workspace-panes.layout-research .pane.reference-pane {
+        flex: 0 0 27.5%;
+        display: flex;
+    }
+    
+    .ai-messages {
+        padding: var(--space-6);
+    }
+    
+    .ai-input-container {
+        padding: var(--space-6);
+    }
+    
+    .modal-content {
+        max-width: 28rem;
+    }
+}
+
+/* ==================== SMALL DESKTOP (1024px+) ==================== */
+
+@media (min-width: 1024px) {
+    :root {
+        --sidebar-width: 18rem;
+        --editor-padding: 2rem;
+        --editor-max-width: 50rem;
+    }
+    
+    .app-header {
+        padding: 0 var(--space-6);
+    }
+    
+    .writing-editor {
+        padding: var(--editor-padding);
+        font-size: calc(var(--editor-font-size) * 1.1);
+        line-height: calc(var(--editor-line-height) * 1.05);
+    }
+    
+    .focus-mode .writing-editor {
+        padding: var(--space-10) var(--space-8);
+        font-size: calc(var(--editor-font-size) * 1.15);
+    }
+    
+    .layout-toolbar {
+        padding: 0 var(--space-8);
+    }
+    
+    /* Optimal multi-pane layouts */
+    .workspace-panes.layout-split .pane.editor-pane {
+        flex: 0 0 55%;
+    }
+    
+    .workspace-panes.layout-split .pane.ai-pane {
+        flex: 0 0 45%;
+    }
+    
+    .workspace-panes.layout-research .pane.editor-pane {
+        flex: 0 0 40%;
+    }
+    
+    .workspace-panes.layout-research .pane.notes-pane {
+        flex: 0 0 30%;
+    }
+    
+    .workspace-panes.layout-research .pane.reference-pane {
+        flex: 0 0 30%;
+    }
+    
+    .workspace-panes.layout-ai-enhanced .pane.editor-pane {
+        flex: 0 0 50%;
+    }
+    
+    .workspace-panes.layout-ai-enhanced .pane.ai-pane {
+        flex: 0 0 25%;
+    }
+    
+    .workspace-panes.layout-ai-enhanced .pane.outline-pane {
+        flex: 0 0 25%;
+        display: flex;
+    }
+    
+    .analytics-panel.expanded {
+        height: calc(var(--analytics-height-expanded) * 1.2);
+    }
+    
+    .modal-content {
+        max-width: var(--modal-max-width);
+    }
+}
+
+/* ==================== LARGE DESKTOP (1280px+) ==================== */
+
+@media (min-width: 1280px) {
+    :root {
+        --sidebar-width: 20rem;
+        --editor-max-width: 55rem;
+    }
+    
+    .writing-editor {
+        font-size: calc(var(--editor-font-size) * 1.15);
+    }
+    
+    .focus-mode .writing-editor {
+        font-size: calc(var(--editor-font-size) * 1.2);
+        max-width: calc(var(--editor-max-width) * 1.1);
+    }
+    
+    /* Enhanced multi-pane experience */
+    .workspace-panes.layout-research .pane.editor-pane {
+        flex: 0 0 45%;
+    }
+    
+    .workspace-panes.layout-research .pane.notes-pane {
+        flex: 0 0 27.5%;
+    }
+    
+    .workspace-panes.layout-research .pane.reference-pane {
+        flex: 0 0 27.5%;
+    }
+    
+    .pane-content {
+        padding: var(--space-1);
+    }
+    
+    .ai-messages {
+        padding: var(--space-8);
+    }
+    
+    .modal-content {
+        max-width: 36rem;
+    }
+    
+    .settings-content {
+        max-height: 28rem;
+    }
+}
+
+/* ==================== EXTRA LARGE DESKTOP (1536px+) ==================== */
+
+@media (min-width: 1536px) {
+    :root {
+        --sidebar-width: 22rem;
+        --editor-max-width: 60rem;
+    }
+    
+    .app-container {
+        max-width: 120rem;
+        margin: 0 auto;
+        border-left: 1px solid var(--color-border);
+        border-right: 1px solid var(--color-border);
+    }
+    
+    .writing-editor {
+        font-size: calc(var(--editor-font-size) * 1.2);
+        line-height: calc(var(--editor-line-height) * 1.1);
+    }
+    
+    .focus-mode .writing-editor {
+        font-size: calc(var(--editor-font-size) * 1.25);
+        max-width: calc(var(--editor-max-width) * 1.15);
+        padding: var(--space-12) var(--space-10);
+    }
+    
+    /* Four-pane layouts become viable */
+    .workspace-panes.layout-research .pane.editor-pane {
+        flex: 0 0 40%;
+    }
+    
+    .workspace-panes.layout-research .pane.notes-pane {
+        flex: 0 0 25%;
+    }
+    
+    .workspace-panes.layout-research .pane.reference-pane {
+        flex: 0 0 25%;
+    }
+    
+    .workspace-panes.layout-research .pane.outline-pane {
+        flex: 0 0 10%;
+        display: flex;
+    }
+    
+    .modal-content {
+        max-width: 42rem;
+    }
+}
+
+/* ==================== ULTRA WIDE (1920px+) ==================== */
+
+@media (min-width: 1920px) {
+    :root {
+        --sidebar-width: 24rem;
+        --editor-max-width: 65rem;
+    }
+    
+    .focus-mode .writing-editor {
+        max-width: calc(var(--editor-max-width) * 1.2);
+        font-size: calc(var(--editor-font-size) * 1.3);
+    }
+    
+    /* Enhanced pane system for ultra-wide displays */
+    .workspace-panes.layout-ai-enhanced .pane.editor-pane {
+        flex: 0 0 45%;
+    }
+    
+    .workspace-panes.layout-ai-enhanced .pane.ai-pane {
+        flex: 0 0 30%;
+    }
+    
+    .workspace-panes.layout-ai-enhanced .pane.outline-pane {
+        flex: 0 0 25%;
+    }
+}
+
+/* ==================== HEIGHT-BASED RESPONSIVE DESIGN ==================== */
+
+/* Short screens (landscape phones, some tablets) */
+@media (max-height: 600px) {
+    :root {
+        --header-height: 2.5rem;
+        --toolbar-height: 2rem;
+        --analytics-height: 3rem;
+    }
+    
+    .writing-editor {
+        padding: var(--space-3);
+    }
+    
+    .modal-body {
+        max-height: 40vh;
+    }
+    
+    .settings-content {
+        max-height: 20rem;
+    }
+    
+    .analytics-panel.expanded {
+        height: 8rem;
+    }
+}
+
+/* Very short screens */
+@media (max-height: 480px) {
+    .analytics-panel {
+        display: none;
+    }
+    
+    .focus-mode .app-header,
+    .focus-mode .layout-toolbar {
+        opacity: 0.1;
+    }
+    
+    .modal-body {
+        max-height: 30vh;
+        padding: var(--space-4);
+    }
+}
+
+/* Tall screens (desktop monitors) */
+@media (min-height: 900px) {
+    .writing-editor {
+        padding: var(--space-8) var(--space-6);
+    }
+    
+    .focus-mode .writing-editor {
+        padding: var(--space-12) var(--space-8);
+    }
+    
+    .analytics-panel.expanded {
+        height: calc(var(--analytics-height-expanded) * 1.5);
+    }
+    
+    .modal-body {
+        max-height: 70vh;
+    }
+    
+    .settings-content {
+        max-height: 32rem;
+    }
+}
+
+/* Very tall screens */
+@media (min-height: 1200px) {
+    .focus-mode .writing-editor {
+        padding: var(--space-16) var(--space-10);
+    }
+    
+    .ai-messages {
+        padding: var(--space-10);
+    }
+}
+
+/* ==================== ORIENTATION-BASED STYLES ==================== */
+
+@media (orientation: landscape) and (max-height: 600px) {
+    /* Landscape mobile optimizations */
+    .project-sidebar {
+        width: calc(var(--sidebar-width) * 0.8);
+    }
+    
+    .writing-editor {
+        font-size: calc(var(--editor-font-size) * 0.9);
+        padding: var(--space-3);
+    }
+    
+    .analytics-panel {
+        display: none;
+    }
+}
+
+@media (orientation: portrait) {
+    /* Portrait-specific optimizations */
+    .focus-mode .writing-editor {
+        padding-left: var(--space-4);
+        padding-right: var(--space-4);
+    }
+    
+    .workspace-panes.layout-split {
+        flex-direction: column;
+    }
+    
+    .workspace-panes.layout-split .pane.editor-pane {
+        flex: 0 0 60%;
+        border-right: none;
+        border-bottom: var(--pane-border-width) solid var(--color-border);
+    }
+    
+    .workspace-panes.layout-split .pane.ai-pane {
+        flex: 0 0 40%;
+    }
+}
+
+/* ==================== DEVICE-SPECIFIC OPTIMIZATIONS ==================== */
+
+/* Touch device optimizations */
+@media (pointer: coarse) {
+    .icon-button,
+    .header-button,
+    .pane-action-btn {
+        min-height: 44px;
+        min-width: 44px;
+        padding: var(--space-3);
+    }
+    
+    .button {
+        min-height: 44px;
+        padding: var(--space-3) var(--space-4);
+    }
+    
+    .form-input,
+    .form-textarea,
+    .form-select {
+        min-height: 44px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .ai-input {
+        font-size: 16px; /* Prevents zoom on iOS */
+        min-height: 44px;
+    }
+    
+    .session-type-btn {
+        padding: var(--space-6);
+        min-height: 6rem;
+    }
+    
+    .chip,
+    .suggestion-chip {
+        min-height: 36px;
+        padding: var(--space-2) var(--space-4);
+    }
+}
+
+/* Mouse/trackpad device optimizations */
+@media (pointer: fine) {
+    .tooltip:hover::before,
+    .tooltip:hover::after {
+        opacity: 1;
+    }
+    
+    .project-menu-btn {
+        opacity: 0;
+    }
+    
+    .project-item:hover .project-menu-btn {
+        opacity: 1;
+    }
+}
+
+/* ==================== HOVER CAPABILITY ==================== */
+
+@media (hover: hover) {
+    /* Enhanced hover states for devices that support hover */
+    .button:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .suggestion-chip:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-sm);
+    }
+}
+
+@media (hover: none) {
+    /* Remove hover effects on touch devices */
+    .button:hover,
+    .card:hover,
+    .suggestion-chip:hover {
+        transform: none;
+        box-shadow: initial;
+    }
+    
+    .focus-mode .app-header,
+    .focus-mode .layout-toolbar,
+    .focus-mode .analytics-panel,
+    .focus-mode .project-sidebar {
+        opacity: 1; /* Always visible on touch devices */
+    }
+}
+
+/* ==================== REDUCED MOTION ==================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .button:hover,
+    .card:hover,
+    .suggestion-chip:hover {
+        transform: none !important;
+    }
+    
+    .loading-bar,
+    .progress-indeterminate .progress-bar,
+    .skeleton {
+        animation: none !important;
+    }
+}
+
+/* ==================== HIGH PIXEL DENSITY ==================== */
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    /* High DPI optimizations */
+    .writing-editor {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    
+    .app-logo svg,
+    .loading-logo svg {
+        shape-rendering: geometricPrecision;
+    }
+}
+
+/* ==================== PRINT STYLES ==================== */
+
+@media print {
+    .app-header,
+    .layout-toolbar,
+    .project-sidebar,
+    .analytics-panel,
+    .pane-header,
+    .ai-pane {
+        display: none !important;
+    }
+    
+    .workspace-panes {
+        display: block !important;
+    }
+    
+    .pane.editor-pane {
+        display: block !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+    
+    .writing-editor {
+        font-family: 'Times New Roman', serif !important;
+        font-size: 12pt !important;
+        line-height: 1.6 !important;
+        color: #000000 !important;
+        background: #ffffff !important;
+        border: none !important;
+        padding: 1in !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+    
+    .editor-container {
+        height: auto !important;
+    }
+}
+
+/* ==================== CONTAINER QUERIES (Future Enhancement) ==================== */
+
+/* When container queries are better supported */
+/* @container (min-width: 600px) {
+    .workspace-panes.layout-split .pane.ai-pane {
+        display: flex;
+    }
+} */

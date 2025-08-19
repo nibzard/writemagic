@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WriteMagic WASM Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a8b;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border-left: 4px solid #007cba;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+        .status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>WriteMagic WASM Test Page</h1>
+    <p>This page tests the WriteMagic WASM module functionality.</p>
+    
+    <div class="container">
+        <h2>Module Status</h2>
+        <div id="status" class="status loading">Loading WASM module...</div>
+        <button id="init-btn" onclick="initializeEngine()" disabled>Initialize Engine</button>
+        <button id="test-btn" onclick="runTests()" disabled>Run Tests</button>
+    </div>
+
+    <div class="container">
+        <h2>Test Results</h2>
+        <div id="results"></div>
+    </div>
+
+    <div class="container">
+        <h2>Interactive Demo</h2>
+        <div>
+            <h3>Project Management</h3>
+            <input type="text" id="project-name" placeholder="Project Name" value="My Novel">
+            <input type="text" id="project-desc" placeholder="Project Description" value="A test novel project">
+            <button onclick="createProject()" disabled id="create-project-btn">Create Project</button>
+        </div>
+        <div>
+            <h3>Document Management</h3>
+            <input type="text" id="doc-title" placeholder="Document Title" value="Chapter 1">
+            <textarea id="doc-content" placeholder="Document Content" rows="4" cols="50">It was a dark and stormy night...</textarea>
+            <br>
+            <button onclick="createDocument()" disabled id="create-doc-btn">Create Document</button>
+            <button onclick="updateDocument()" disabled id="update-doc-btn">Update Document</button>
+        </div>
+        <div>
+            <h3>AI Integration</h3>
+            <input type="text" id="ai-prompt" placeholder="AI Prompt" value="Complete this story: Once upon a time">
+            <select id="ai-model">
+                <option value="gpt-4">GPT-4</option>
+                <option value="claude">Claude</option>
+            </select>
+            <button onclick="completeText()" disabled id="ai-btn">Complete Text</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { WriteMagicEngine, WasmCompletionRequest, log, log_error } from './pkg/writemagic_wasm.js';
+
+        let engine = null;
+        let currentProject = null;
+        let currentDocument = null;
+
+        // Utility functions
+        function addResult(title, content, isError = false) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = isError ? 'result error' : 'result';
+            resultDiv.innerHTML = `
+                <h4>${title}</h4>
+                ${typeof content === 'object' ? `<pre>${JSON.stringify(content, null, 2)}</pre>` : `<p>${content}</p>`}
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function setStatus(message, type = 'loading') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function enableButtons(enabled) {
+            document.getElementById('test-btn').disabled = !enabled;
+            document.getElementById('create-project-btn').disabled = !enabled;
+            document.getElementById('create-doc-btn').disabled = !enabled;
+            document.getElementById('update-doc-btn').disabled = !enabled;
+            document.getElementById('ai-btn').disabled = !enabled;
+        }
+
+        // Initialize WASM module
+        async function loadWasm() {
+            try {
+                await init();
+                setStatus('WASM module loaded successfully', 'success');
+                document.getElementById('init-btn').disabled = false;
+                log('WASM module initialized');
+            } catch (error) {
+                setStatus(`Failed to load WASM module: ${error}`, 'error');
+                log_error(`WASM init error: ${error}`);
+                addResult('WASM Load Error', error.toString(), true);
+            }
+        }
+
+        // Initialize engine
+        window.initializeEngine = async function() {
+            try {
+                setStatus('Initializing WriteMagic engine...', 'loading');
+                engine = new WriteMagicEngine();
+                await engine.initialize('{"enable_logging": true, "storage": "memory"}');
+                setStatus('WriteMagic engine initialized', 'success');
+                enableButtons(true);
+                addResult('Engine Initialized', 'WriteMagic engine is ready');
+            } catch (error) {
+                setStatus(`Failed to initialize engine: ${error}`, 'error');
+                addResult('Engine Init Error', error.toString(), true);
+            }
+        };
+
+        // Run comprehensive tests
+        window.runTests = async function() {
+            if (!engine) {
+                addResult('Test Error', 'Engine not initialized', true);
+                return;
+            }
+
+            try {
+                // Test 1: Check engine status
+                const isInitialized = engine.is_initialized();
+                addResult('Engine Status Test', `Engine initialized: ${isInitialized}`);
+
+                // Test 2: Create project
+                const project = await engine.create_project(
+                    "Test Project",
+                    "A project created by automated tests",
+                    "test-user-123"
+                );
+                currentProject = project;
+                addResult('Project Creation Test', project);
+
+                // Test 3: Create document
+                const document = await engine.create_document(
+                    project.id,
+                    "Test Document",
+                    "This is test content created by automated tests."
+                );
+                currentDocument = document;
+                addResult('Document Creation Test', document);
+
+                // Test 4: Update document
+                const updatedDoc = await engine.update_document(
+                    document.id,
+                    "This is updated content from automated tests."
+                );
+                addResult('Document Update Test', updatedDoc);
+
+                // Test 5: Get document
+                const retrievedDoc = await engine.get_document(document.id);
+                addResult('Document Retrieval Test', retrievedDoc);
+
+                // Test 6: Get project
+                const retrievedProject = await engine.get_project(project.id);
+                addResult('Project Retrieval Test', retrievedProject);
+
+                // Test 7: AI completion
+                const request = new WasmCompletionRequest("Test prompt for AI", "gpt-4");
+                request.set_max_tokens(100);
+                request.set_temperature(0.7);
+                const completion = await engine.complete_text(request);
+                addResult('AI Completion Test', completion);
+
+                addResult('All Tests Completed', 'All automated tests completed successfully', false);
+            } catch (error) {
+                addResult('Test Error', error.toString(), true);
+            }
+        };
+
+        // Interactive demo functions
+        window.createProject = async function() {
+            if (!engine) return;
+            
+            const name = document.getElementById('project-name').value;
+            const desc = document.getElementById('project-desc').value;
+            
+            try {
+                const project = await engine.create_project(name, desc, "demo-user");
+                currentProject = project;
+                addResult('Project Created', project);
+            } catch (error) {
+                addResult('Project Creation Error', error.toString(), true);
+            }
+        };
+
+        window.createDocument = async function() {
+            if (!engine || !currentProject) {
+                addResult('Document Error', 'No project available. Create a project first.', true);
+                return;
+            }
+            
+            const title = document.getElementById('doc-title').value;
+            const content = document.getElementById('doc-content').value;
+            
+            try {
+                const document = await engine.create_document(currentProject.id, title, content);
+                currentDocument = document;
+                addResult('Document Created', document);
+            } catch (error) {
+                addResult('Document Creation Error', error.toString(), true);
+            }
+        };
+
+        window.updateDocument = async function() {
+            if (!engine || !currentDocument) {
+                addResult('Document Error', 'No document available. Create a document first.', true);
+                return;
+            }
+            
+            const content = document.getElementById('doc-content').value;
+            
+            try {
+                const updatedDoc = await engine.update_document(currentDocument.id, content);
+                currentDocument = updatedDoc;
+                addResult('Document Updated', updatedDoc);
+            } catch (error) {
+                addResult('Document Update Error', error.toString(), true);
+            }
+        };
+
+        window.completeText = async function() {
+            if (!engine) return;
+            
+            const prompt = document.getElementById('ai-prompt').value;
+            const model = document.getElementById('ai-model').value;
+            
+            try {
+                const request = new WasmCompletionRequest(prompt, model);
+                request.set_max_tokens(150);
+                request.set_temperature(0.8);
+                const completion = await engine.complete_text(request);
+                addResult('AI Completion', completion);
+            } catch (error) {
+                addResult('AI Completion Error', error.toString(), true);
+            }
+        };
+
+        // Load WASM when page loads
+        loadWasm();
+    </script>
+</body>
+</html>

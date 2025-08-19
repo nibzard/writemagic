@@ -8,6 +8,10 @@ use crate::{InMemoryDocumentRepository, InMemoryProjectRepository, SqliteDocumen
 use crate::services::{DocumentManagementService, ProjectManagementService, ContentAnalysisService};
 use crate::ai_writing_integration::{IntegratedWritingService, IntegratedWritingServiceBuilder};
 
+// Import IndexedDB repositories for WASM builds
+#[cfg(target_arch = "wasm32")]
+use crate::web_persistence::{IndexedDbManager, IndexedDbConfig, IndexedDbDocumentRepository, IndexedDbProjectRepository, check_indexeddb_support};
+
 // Import AI components
 use writemagic_ai::{
     AIOrchestrationService, 
@@ -23,9 +27,28 @@ use writemagic_ai::{
 #[derive(Debug, Clone)]
 pub struct ApplicationConfig {
     pub database: DatabaseConfig,
+    pub storage: StorageConfig,
     pub ai: AIConfig,
     pub logging: LoggingConfig,
     pub security: SecurityConfig,
+}
+
+/// Storage configuration for different platforms
+#[derive(Debug, Clone)]
+pub struct StorageConfig {
+    pub storage_type: StorageType,
+    pub database_config: Option<DatabaseConfig>,
+    #[cfg(target_arch = "wasm32")]
+    pub indexeddb_config: Option<IndexedDbConfig>,
+}
+
+/// Storage backend types
+#[derive(Debug, Clone, PartialEq)]
+pub enum StorageType {
+    InMemory,
+    SQLite,
+    #[cfg(target_arch = "wasm32")]
+    IndexedDB,
 }
 
 /// AI provider configuration
@@ -55,11 +78,46 @@ pub struct SecurityConfig {
 
 impl Default for ApplicationConfig {
     fn default() -> Self {
+        #[cfg(target_arch = "wasm32")]
+        let storage = StorageConfig {
+            storage_type: StorageType::IndexedDB,
+            database_config: None,
+            indexeddb_config: Some(IndexedDbConfig::default()),
+        };
+        
+        #[cfg(not(target_arch = "wasm32"))]
+        let storage = StorageConfig {
+            storage_type: StorageType::SQLite,
+            database_config: Some(DatabaseConfig::default()),
+        };
+        
         Self {
-            database: DatabaseConfig::default(),
+            database: DatabaseConfig::default(), // For backwards compatibility
+            storage,
             ai: AIConfig::default(),
             logging: LoggingConfig::default(),
             security: SecurityConfig::default(),
+        }
+    }
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        #[cfg(target_arch = "wasm32")]
+        {
+            Self {
+                storage_type: StorageType::IndexedDB,
+                database_config: None,
+                indexeddb_config: Some(IndexedDbConfig::default()),
+            }
+        }
+        
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Self {
+                storage_type: StorageType::SQLite,
+                database_config: Some(DatabaseConfig::default()),
+            }
         }
     }
 }
@@ -159,6 +217,10 @@ pub struct CoreEngine {
     // Database manager (if using SQLite)
     database_manager: Option<DatabaseManager>,
     
+    // IndexedDB manager (if using IndexedDB)
+    #[cfg(target_arch = "wasm32")]
+    indexeddb_manager: Option<Arc<tokio::sync::Mutex<IndexedDbManager>>>,
+    
     // Repository implementations
     document_repository: Arc<dyn DocumentRepository>,
     project_repository: Arc<dyn ProjectRepository>,
@@ -190,23 +252,44 @@ impl CoreEngine {
                 .map_err(|e| WritemagicError::internal(format!("Failed to create tokio runtime: {}", e)))?
         );
 
-        // Initialize database and repositories
-        let (database_manager, document_repository, project_repository) = if config.database.database_url == "sqlite::memory:" {
-            log::info!("Using in-memory storage");
-            (
-                None,
-                Arc::new(InMemoryDocumentRepository::new()) as Arc<dyn DocumentRepository>,
-                Arc::new(InMemoryProjectRepository::new()) as Arc<dyn ProjectRepository>,
-            )
-        } else {
-            log::info!("Using SQLite storage at: {}", config.database.database_url);
-            let database_manager = DatabaseManager::new(config.database.clone()).await?;
-            let pool = database_manager.pool().clone();
-            (
-                Some(database_manager),
-                Arc::new(SqliteDocumentRepository::new(pool.clone())) as Arc<dyn DocumentRepository>,
-                Arc::new(SqliteProjectRepository::new(pool)) as Arc<dyn ProjectRepository>,
-            )
+        // Initialize storage based on configuration
+        let (database_manager, document_repository, project_repository) = match config.storage.storage_type {
+            StorageType::InMemory => {
+                log::info!("Using in-memory storage");
+                (
+                    None,
+                    Arc::new(InMemoryDocumentRepository::new()) as Arc<dyn DocumentRepository>,
+                    Arc::new(InMemoryProjectRepository::new()) as Arc<dyn ProjectRepository>,
+                )
+            },
+            StorageType::SQLite => {
+                let db_config = config.storage.database_config.as_ref()
+                    .unwrap_or(&config.database);
+                    
+                if db_config.database_url == "sqlite::memory:" {
+                    log::info!("Using SQLite in-memory storage");
+                    (
+                        None,
+                        Arc::new(InMemoryDocumentRepository::new()) as Arc<dyn DocumentRepository>,
+                        Arc::new(InMemoryProjectRepository::new()) as Arc<dyn ProjectRepository>,
+                    )
+                } else {
+                    log::info!("Using SQLite storage at: {}", db_config.database_url);
+                    let database_manager = DatabaseManager::new(db_config.clone()).await?;
+                    let pool = database_manager.pool().clone();
+                    (
+                        Some(database_manager),
+                        Arc::new(SqliteDocumentRepository::new(pool.clone())) as Arc<dyn DocumentRepository>,
+                        Arc::new(SqliteProjectRepository::new(pool)) as Arc<dyn ProjectRepository>,
+                    )
+                }
+            },
+            #[cfg(target_arch = "wasm32")]
+            StorageType::IndexedDB => {
+                return Err(WritemagicError::configuration(
+                    "IndexedDB initialization should be handled separately in WASM environment"
+                ));
+            },
         };
 
         // Initialize AI services
@@ -255,6 +338,8 @@ impl CoreEngine {
         Ok(Self {
             config,
             database_manager,
+            #[cfg(target_arch = "wasm32")]
+            indexeddb_manager: None,
             document_repository,
             project_repository,
             ai_orchestration_service,
@@ -351,6 +436,7 @@ impl CoreEngine {
         
         let app_config = ApplicationConfig {
             database: DatabaseConfig::default(),
+            storage: StorageConfig::default(),
             ai: ai_config,
             logging: LoggingConfig::default(),
             security: SecurityConfig::default(),
@@ -373,12 +459,131 @@ impl CoreEngine {
                 enable_wal: false,
                 enable_foreign_keys: true,
             },
+            storage: StorageConfig {
+                storage_type: StorageType::InMemory,
+                database_config: None,
+                #[cfg(target_arch = "wasm32")]
+                indexeddb_config: None,
+            },
             ai: ai_config,
             logging: LoggingConfig::default(),
             security: SecurityConfig::default(),
         };
         
         Self::new_with_config(app_config).await
+    }
+
+    /// Create engine with IndexedDB storage for WASM environment
+    #[cfg(target_arch = "wasm32")]
+    pub async fn new_with_indexeddb(config: ApplicationConfig) -> Result<Self> {
+        log::info!("Initializing WriteMagic CoreEngine with IndexedDB");
+        
+        // Check IndexedDB support
+        check_indexeddb_support()
+            .map_err(|e| WritemagicError::configuration(&format!("IndexedDB not supported: {:?}", e)))?;
+        
+        // Create tokio runtime
+        let tokio_runtime = Arc::new(
+            tokio::runtime::Runtime::new()
+                .map_err(|e| WritemagicError::internal(format!("Failed to create tokio runtime: {}", e)))?
+        );
+        
+        // Initialize IndexedDB
+        let indexeddb_config = config.storage.indexeddb_config.as_ref()
+            .cloned()
+            .unwrap_or_default();
+        
+        let mut indexeddb_manager = IndexedDbManager::new(indexeddb_config);
+        indexeddb_manager.initialize().await
+            .map_err(|e| WritemagicError::database(&format!("IndexedDB initialization failed: {:?}", e)))?;
+        
+        let indexeddb_manager = Arc::new(tokio::sync::Mutex::new(indexeddb_manager));
+        
+        // Create IndexedDB repositories
+        let document_repository = Arc::new(IndexedDbDocumentRepository::new(indexeddb_manager.clone())) as Arc<dyn DocumentRepository>;
+        let project_repository = Arc::new(IndexedDbProjectRepository::new(indexeddb_manager.clone())) as Arc<dyn ProjectRepository>;
+        
+        log::info!("IndexedDB repositories initialized");
+        
+        // Initialize AI services
+        let (mut ai_orchestration_service, mut content_filtering_service) = Self::initialize_ai_services(&config.ai).await?;
+        
+        // Initialize context management service
+        let context_management_service = ContextManagementService::new(config.ai.max_context_length);
+        
+        // Initialize AI writing service if AI orchestration is available
+        let ai_writing_service = if ai_orchestration_service.is_some() && content_filtering_service.is_some() {
+            // Take ownership of the services
+            let orchestration_arc = Arc::new(ai_orchestration_service.take().unwrap());
+            let context_arc = Arc::new(context_management_service.clone());
+            let filter_arc = Arc::new(content_filtering_service.take().unwrap());
+            
+            Some(AIWritingService::new(orchestration_arc, context_arc, filter_arc))
+        } else {
+            None
+        };
+        
+        // Initialize domain services
+        let document_management_service = Arc::new(DocumentManagementService::new(
+            document_repository.clone()
+        ));
+        let project_management_service = Arc::new(ProjectManagementService::new(
+            project_repository.clone(),
+            document_repository.clone(),
+        ));
+        let content_analysis_service = Arc::new(ContentAnalysisService::new());
+        
+        // Initialize integrated writing service if AI is available
+        let integrated_writing_service = if let Some(ai_writing) = &ai_writing_service {
+            let integrated = IntegratedWritingServiceBuilder::new()
+                .with_ai_writing_service(Arc::new(ai_writing.clone()))
+                .with_document_service(document_management_service.clone())
+                .with_project_service(project_management_service.clone())
+                .with_content_analysis_service(content_analysis_service.clone())
+                .with_document_repository(document_repository.clone())
+                .with_project_repository(project_repository.clone())
+                .build()?;
+            Some(Arc::new(integrated))
+        } else {
+            None
+        };
+        
+        Ok(Self {
+            config,
+            database_manager: None,
+            indexeddb_manager: Some(indexeddb_manager),
+            document_repository,
+            project_repository,
+            ai_orchestration_service,
+            context_management_service,
+            content_filtering_service,
+            ai_writing_service,
+            document_management_service,
+            project_management_service,
+            content_analysis_service,
+            integrated_writing_service,
+            tokio_runtime,
+        })
+    }
+    
+    /// Create engine with default IndexedDB configuration for WASM
+    #[cfg(target_arch = "wasm32")]
+    pub async fn new_indexeddb_default() -> Result<Self> {
+        let config = ApplicationConfig::default(); // Uses IndexedDB by default in WASM
+        Self::new_with_indexeddb(config).await
+    }
+    
+    /// Create engine with IndexedDB and AI providers for WASM
+    #[cfg(target_arch = "wasm32")]
+    pub async fn new_indexeddb_with_ai(claude_key: Option<String>, openai_key: Option<String>) -> Result<Self> {
+        let mut ai_config = AIConfig::default();
+        ai_config.claude_api_key = claude_key;
+        ai_config.openai_api_key = openai_key;
+        
+        let mut app_config = ApplicationConfig::default(); // Uses IndexedDB by default in WASM
+        app_config.ai = ai_config;
+        
+        Self::new_with_indexeddb(app_config).await
     }
 
     // Repository access methods
@@ -397,10 +602,27 @@ impl CoreEngine {
     pub fn database_manager(&self) -> Option<&DatabaseManager> {
         self.database_manager.as_ref()
     }
+    
+    /// Get IndexedDB manager (if using IndexedDB)
+    #[cfg(target_arch = "wasm32")]
+    pub fn indexeddb_manager(&self) -> Option<Arc<tokio::sync::Mutex<IndexedDbManager>>> {
+        self.indexeddb_manager.as_ref().cloned()
+    }
 
     /// Check if the engine is using in-memory storage
     pub fn is_in_memory(&self) -> bool {
-        self.database_manager.is_none()
+        matches!(self.config.storage.storage_type, StorageType::InMemory)
+    }
+    
+    /// Check if the engine is using IndexedDB storage
+    #[cfg(target_arch = "wasm32")]
+    pub fn is_indexeddb(&self) -> bool {
+        matches!(self.config.storage.storage_type, StorageType::IndexedDB)
+    }
+    
+    /// Check if the engine is using SQLite storage
+    pub fn is_sqlite(&self) -> bool {
+        matches!(self.config.storage.storage_type, StorageType::SQLite)
     }
 
     // AI service access methods

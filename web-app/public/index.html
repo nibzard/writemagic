@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="description" content="WriteMagic - AI-powered writing application for professional writers and content creators">
+    
+    <title>WriteMagic - Write Better, Write Smarter</title>
+    
+    <!-- Progressive Web App manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Favicon and touch icons -->
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/styles/reset.css">
+    <link rel="stylesheet" href="/styles/variables.css">
+    <link rel="stylesheet" href="/styles/base.css">
+    <link rel="stylesheet" href="/styles/components.css">
+    <link rel="stylesheet" href="/styles/layout.css">
+    <link rel="stylesheet" href="/styles/themes.css">
+    <link rel="stylesheet" href="/styles/responsive.css">
+    <link rel="stylesheet" href="/styles/accessibility.css">
+    
+    <!-- Enhanced offline and PWA styles -->
+    <style>
+        /* Offline mode styles */
+        .offline-mode .ai-health-indicator {
+            opacity: 0.6;
+            position: relative;
+        }
+        
+        .offline-mode .ai-health-indicator::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            border: 1px solid white;
+            animation: pulse 2s infinite;
+        }
+        
+        .offline-mode .header-button[disabled] {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .offline-mode .suggestion-chip[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #e5e7eb;
+            color: #9ca3af;
+        }
+        
+        /* System messages in AI chat */
+        .ai-message.system-message {
+            background: #f3f4f6;
+            border-left: 3px solid #6b7280;
+            margin: 8px 0;
+            padding: 8px 12px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+        }
+        
+        .ai-message.system-message .message-content {
+            color: #6b7280;
+        }
+        
+        /* Toast notification styles */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1f2937;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            z-index: 10000;
+            animation: slideUp 0.3s ease-out;
+            max-width: 90vw;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .toast.success { background: #059669; }
+        .toast.warning { background: #d97706; }
+        .toast.error { background: #dc2626; }
+        .toast.info { background: #3b82f6; }
+        
+        .toast.hide {
+            animation: slideDown 0.3s ease-in;
+        }
+        
+        @keyframes slideUp {
+            from { 
+                transform: translate(-50%, 100%); 
+                opacity: 0; 
+            }
+            to { 
+                transform: translate(-50%, 0); 
+                opacity: 1; 
+            }
+        }
+        
+        @keyframes slideDown {
+            from { 
+                transform: translate(-50%, 0); 
+                opacity: 1; 
+            }
+            to { 
+                transform: translate(-50%, 100%); 
+                opacity: 0; 
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* PWA loading enhancements */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        
+        .loading-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        /* Enhanced loading progress */
+        .loading-progress {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        
+        .loading-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed, #4f46e5);
+            background-size: 200% 100%;
+            animation: loading-shimmer 2s infinite;
+            border-radius: 2px;
+        }
+        
+        @keyframes loading-shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        /* Dark theme support */
+        @media (prefers-color-scheme: dark) {
+            .ai-message.system-message {
+                background: #374151;
+                border-left-color: #9ca3af;
+            }
+            
+            .ai-message.system-message .message-content {
+                color: #d1d5db;
+            }
+        }
+        
+        /* Install prompt styles */
+        .install-prompt {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+            z-index: 1000;
+            animation: slideInRight 0.3s ease-out;
+        }
+        
+        .install-prompt h4 {
+            margin: 0 0 8px 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .install-prompt p {
+            margin: 0 0 12px 0;
+            font-size: 0.85rem;
+            color: #6b7280;
+            line-height: 1.4;
+        }
+        
+        .install-prompt .install-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .install-prompt button {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .install-prompt .install-btn {
+            background: #4f46e5;
+            color: white;
+        }
+        
+        .install-prompt .install-btn:hover {
+            background: #4338ca;
+        }
+        
+        .install-prompt .dismiss-btn {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .install-prompt .dismiss-btn:hover {
+            background: #e5e7eb;
+        }
+        
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+    
+    <!-- Service Worker registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch(registrationError => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
+</head>
+<body class="theme-light">
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen" aria-hidden="true">
+        <div class="loading-content">
+            <div class="loading-logo">
+                <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 8h48v48H8z" fill="url(#logoGradient)"/>
+                    <path d="M16 20h32v4H16zM16 28h24v4H16zM16 36h28v4H16zM16 44h20v4H16z" fill="white"/>
+                    <defs>
+                        <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#4f46e5"/>
+                            <stop offset="100%" style="stop-color:#7c3aed"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <h1 class="loading-title">WriteMagic</h1>
+            <div class="loading-progress">
+                <div class="loading-bar"></div>
+            </div>
+            <p class="loading-status">Initializing writing engine...</p>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="app" class="app-container" style="display: none;">
+        <!-- Header -->
+        <header class="app-header" role="banner">
+            <div class="header-left">
+                <button class="sidebar-toggle" aria-label="Toggle project sidebar">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/>
+                    </svg>
+                </button>
+                <div class="app-logo">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 3h18v18H3z" fill="url(#headerLogoGradient)"/>
+                        <path d="M6 7.5h12v1.5H6zM6 10.5h9v1.5H6zM6 13.5h10.5v1.5H6zM6 16.5h7.5v1.5H6z" fill="white"/>
+                        <defs>
+                            <linearGradient id="headerLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#4f46e5"/>
+                                <stop offset="100%" style="stop-color:#7c3aed"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <span class="app-name">WriteMagic</span>
+                </div>
+            </div>
+            
+            <div class="header-center">
+                <div class="document-breadcrumb">
+                    <span class="project-name" id="current-project">Untitled Project</span>
+                    <span class="breadcrumb-separator">/</span>
+                    <span class="document-name" id="current-document">New Document</span>
+                </div>
+            </div>
+            
+            <div class="header-right">
+                <div class="writing-stats">
+                    <span class="stat-item">
+                        <span class="stat-value" id="word-count">0</span>
+                        <span class="stat-label">words</span>
+                    </span>
+                    <span class="stat-item">
+                        <span class="stat-value" id="session-time">00:00</span>
+                        <span class="stat-label">session</span>
+                    </span>
+                </div>
+                <button class="header-button ai-health-indicator" id="ai-status" aria-label="AI service status">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <circle cx="8" cy="8" r="8" fill="currentColor" opacity="0.2"/>
+                        <circle cx="8" cy="8" r="3" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button class="header-button" id="settings-btn" aria-label="Open settings">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 4.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zM6.5 8a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z"/>
+                        <path fill-rule="evenodd" d="M6.92 2.12a1 1 0 01.96-.72h.24a1 1 0 01.96.72l.14.46a1 1 0 00.63.63l.46.14a1 1 0 01.72.96v.24a1 1 0 01-.72.96l-.46.14a1 1 0 00-.63.63l-.14.46a1 1 0 01-.96.72h-.24a1 1 0 01-.96-.72l-.14-.46a1 1 0 00-.63-.63l-.46-.14a1 1 0 01-.72-.96v-.24a1 1 0 01.72-.96l.46-.14a1 1 0 00.63-.63l.14-.46z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Project Sidebar -->
+            <aside class="project-sidebar" id="project-sidebar" role="complementary">
+                <div class="sidebar-header">
+                    <h2>Projects</h2>
+                    <button class="icon-button" id="new-project-btn" aria-label="Create new project">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 2a1 1 0 011 1v4h4a1 1 0 110 2H9v4a1 1 0 11-2 0V9H3a1 1 0 110-2h4V3a1 1 0 011-1z"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="sidebar-content">
+                    <div class="project-list" id="project-list">
+                        <!-- Projects will be populated dynamically -->
+                        <div class="project-item active" data-project-id="default">
+                            <div class="project-header">
+                                <span class="project-title">Quick Notes</span>
+                                <button class="project-menu-btn" aria-label="Project options">
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                        <circle cx="2" cy="6" r="1"/>
+                                        <circle cx="6" cy="6" r="1"/>
+                                        <circle cx="10" cy="6" r="1"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="document-list">
+                                <div class="document-item active" data-document-id="welcome">
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" class="document-icon">
+                                        <path d="M2 2h8v8H2z"/>
+                                    </svg>
+                                    <span class="document-title">Welcome to WriteMagic</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="sidebar-actions">
+                        <button class="action-button" id="new-document-btn">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/>
+                            </svg>
+                            New Document
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Workspace Area -->
+            <div class="workspace-container">
+                <!-- Layout Toolbar -->
+                <div class="layout-toolbar" role="toolbar" aria-label="Layout options">
+                    <div class="layout-buttons">
+                        <button class="layout-btn active" data-layout="focus" aria-label="Focus mode">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <rect x="2" y="2" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </button>
+                        <button class="layout-btn" data-layout="split" aria-label="Split view">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <rect x="1" y="2" width="6" height="12" fill="none" stroke="currentColor" stroke-width="1"/>
+                                <rect x="9" y="2" width="6" height="12" fill="none" stroke="currentColor" stroke-width="1"/>
+                            </svg>
+                        </button>
+                        <button class="layout-btn" data-layout="research" aria-label="Research mode">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <rect x="1" y="1" width="4.5" height="8" fill="none" stroke="currentColor" stroke-width="1"/>
+                                <rect x="6.5" y="1" width="4" height="8" fill="none" stroke="currentColor" stroke-width="1"/>
+                                <rect x="11.5" y="1" width="3.5" height="8" fill="none" stroke="currentColor" stroke-width="1"/>
+                            </svg>
+                        </button>
+                        <button class="layout-btn" data-layout="ai_enhanced" aria-label="AI-enhanced mode">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 2a6 6 0 100 12A6 6 0 008 2zM6.5 7.5h3v1h-3v-1z"/>
+                                <circle cx="8" cy="8" r="1.5" fill="none" stroke="currentColor"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="toolbar-divider"></div>
+                    
+                    <div class="session-controls">
+                        <button class="session-btn" id="start-focus-session" aria-label="Start focus session">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <path d="M8 4v4l2 2"/>
+                            </svg>
+                            Focus
+                        </button>
+                        <button class="session-btn" id="set-writing-goal" aria-label="Set writing goal">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M2 8l3 3 9-9"/>
+                            </svg>
+                            Goal
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Writing Workspace -->
+                <div class="workspace-panes" id="workspace-panes">
+                    <!-- Primary Editor Pane -->
+                    <div class="pane editor-pane active" id="pane-editor" data-pane-type="editor">
+                        <div class="pane-header">
+                            <div class="pane-title">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                    <path d="M2 2h10v10H2z"/>
+                                </svg>
+                                <span id="editor-document-title">Welcome to WriteMagic</span>
+                            </div>
+                            <div class="pane-actions">
+                                <button class="pane-action-btn" id="editor-word-count" aria-label="Word count details">
+                                    <span class="word-count-display">0 words</span>
+                                </button>
+                                <button class="pane-action-btn" id="editor-save-status" aria-label="Save status">
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                        <path d="M10 3L4.5 8.5 2 6"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="pane-content">
+                            <div class="editor-container">
+                                <textarea 
+                                    id="main-editor" 
+                                    class="writing-editor"
+                                    placeholder="Start writing your masterpiece..."
+                                    aria-label="Main writing editor"
+                                    spellcheck="true"
+                                    autocomplete="off"
+                                    autocorrect="on"
+                                    autocapitalize="sentences"
+                                ># Welcome to WriteMagic
+
+Welcome to WriteMagic, the AI-powered writing application designed specifically for professional writers and content creators.
+
+## Getting Started
+
+WriteMagic helps you write better, faster, and more efficiently with:
+
+- **AI-Powered Assistance**: Get intelligent suggestions, completions, and improvements
+- **Multi-Pane Workspace**: Organize your thoughts with flexible layouts
+- **Focus Sessions**: Time-boxed writing sessions to boost productivity
+- **Real-time Analytics**: Track your writing progress and patterns
+- **Cross-Device Sync**: Write anywhere, anytime
+
+## Quick Tips
+
+1. **Use Layouts**: Try different workspace layouts from the toolbar above
+2. **Set Goals**: Click the "Goal" button to set word count or time targets
+3. **AI Assistance**: Select text and use Ctrl+Space for AI suggestions
+4. **Focus Mode**: Start a focus session for distraction-free writing
+5. **Save Automatically**: Your work is automatically saved as you type
+
+Start writing and let WriteMagic enhance your creative flow!
+</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Assistant Pane (hidden by default) -->
+                    <div class="pane ai-pane" id="pane-ai" data-pane-type="ai_assistant" style="display: none;">
+                        <div class="pane-header">
+                            <div class="pane-title">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                    <path d="M7 2a5 5 0 100 10 5 5 0 000-10zM5.5 6.5h3v1h-3v-1z"/>
+                                </svg>
+                                <span>AI Assistant</span>
+                            </div>
+                            <div class="pane-actions">
+                                <button class="pane-action-btn" id="ai-clear-chat" aria-label="Clear conversation">
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                        <path d="M2 2h8v6H4l-2 2V2z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="pane-content ai-content">
+                            <div class="ai-chat-container">
+                                <div class="ai-messages" id="ai-messages" role="log" aria-label="AI conversation">
+                                    <div class="ai-message system-message">
+                                        <div class="message-content">
+                                            <p>Hello! I'm your AI writing assistant. I can help you:</p>
+                                            <ul>
+                                                <li>Improve and refine your writing</li>
+                                                <li>Generate content ideas and outlines</li>
+                                                <li>Fix grammar and style issues</li>
+                                                <li>Expand or summarize text</li>
+                                                <li>Answer questions about your content</li>
+                                            </ul>
+                                            <p>Try selecting text in the editor and ask me to help!</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="ai-input-container">
+                                    <div class="ai-suggestions" id="ai-suggestions">
+                                        <button class="suggestion-chip" data-suggestion="improve">Improve writing</button>
+                                        <button class="suggestion-chip" data-suggestion="expand">Expand content</button>
+                                        <button class="suggestion-chip" data-suggestion="grammar">Fix grammar</button>
+                                        <button class="suggestion-chip" data-suggestion="summarize">Summarize</button>
+                                    </div>
+                                    
+                                    <div class="ai-input-area">
+                                        <textarea 
+                                            id="ai-input" 
+                                            class="ai-input"
+                                            placeholder="Ask me anything about your writing..."
+                                            rows="3"
+                                            aria-label="Chat with AI assistant"
+                                        ></textarea>
+                                        <button class="ai-send-btn" id="ai-send-btn" aria-label="Send message">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                                <path d="M2 8l12-6-4 6 4 6-12-6z"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Writing Analytics Panel (collapsible) -->
+        <div class="analytics-panel" id="analytics-panel">
+            <div class="panel-header">
+                <h3>Writing Analytics</h3>
+                <button class="panel-toggle" id="analytics-toggle" aria-label="Toggle analytics panel">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 4l-4 4h8l-4-4z"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="panel-content" id="analytics-content">
+                <div class="analytics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Word Count</div>
+                        <div class="metric-value" id="analytics-words">0</div>
+                        <div class="metric-change">+0 today</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">Reading Time</div>
+                        <div class="metric-value" id="analytics-reading-time">0 min</div>
+                        <div class="metric-change">~250 wpm</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">Complexity</div>
+                        <div class="metric-value" id="analytics-complexity">-</div>
+                        <div class="metric-change">Grade level</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">Session Goal</div>
+                        <div class="metric-value" id="analytics-goal">-</div>
+                        <div class="metric-change">Not set</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal" role="dialog" aria-labelledby="settings-title" aria-modal="true">
+        <div class="modal-backdrop" tabindex="-1"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="settings-title">Settings</h2>
+                <button class="modal-close" aria-label="Close settings">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 4l8 8M12 4l-8 8"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="settings-tabs">
+                    <button class="tab-btn active" data-tab="general">General</button>
+                    <button class="tab-btn" data-tab="editor">Editor</button>
+                    <button class="tab-btn" data-tab="ai">AI Settings</button>
+                    <button class="tab-btn" data-tab="accessibility">Accessibility</button>
+                </div>
+                
+                <div class="settings-content">
+                    <div class="tab-panel active" id="tab-general">
+                        <div class="setting-group">
+                            <label for="theme-select">Theme</label>
+                            <select id="theme-select" class="setting-input">
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                                <option value="auto">Auto</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="auto-save-delay">Auto-save delay (ms)</label>
+                            <input type="number" id="auto-save-delay" class="setting-input" value="2000" min="500" max="10000" step="500">
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="enable-analytics" checked>
+                                <span class="checkmark"></span>
+                                Enable writing analytics
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-panel" id="tab-editor">
+                        <div class="setting-group">
+                            <label for="font-size">Font size</label>
+                            <select id="font-size" class="setting-input">
+                                <option value="14">14px</option>
+                                <option value="16" selected>16px</option>
+                                <option value="18">18px</option>
+                                <option value="20">20px</option>
+                                <option value="24">24px</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="line-height">Line height</label>
+                            <select id="line-height" class="setting-input">
+                                <option value="1.4">1.4</option>
+                                <option value="1.5">1.5</option>
+                                <option value="1.6" selected>1.6</option>
+                                <option value="1.8">1.8</option>
+                                <option value="2.0">2.0</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="enable-focus-mode" checked>
+                                <span class="checkmark"></span>
+                                Enable focus mode
+                            </label>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="enable-typewriter-mode">
+                                <span class="checkmark"></span>
+                                Typewriter mode (center cursor)
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-panel" id="tab-ai">
+                        <div class="setting-group">
+                            <label for="ai-provider">AI Provider</label>
+                            <select id="ai-provider" class="setting-input">
+                                <option value="claude">Claude (Anthropic)</option>
+                                <option value="openai">OpenAI GPT-4</option>
+                                <option value="local">Local Model</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="ai-temperature">Creativity Level</label>
+                            <input type="range" id="ai-temperature" class="range-input" min="0" max="1" step="0.1" value="0.7">
+                            <div class="range-labels">
+                                <span>Precise</span>
+                                <span>Creative</span>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="ai-auto-suggestions" checked>
+                                <span class="checkmark"></span>
+                                Show automatic suggestions
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-panel" id="tab-accessibility">
+                        <div class="setting-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="high-contrast-mode">
+                                <span class="checkmark"></span>
+                                High contrast mode
+                            </label>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="keyboard-navigation" checked>
+                                <span class="checkmark"></span>
+                                Enhanced keyboard navigation
+                            </label>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="screen-reader-mode">
+                                <span class="checkmark"></span>
+                                Screen reader optimizations
+                            </label>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="text-size-multiplier">Text size multiplier</label>
+                            <select id="text-size-multiplier" class="setting-input">
+                                <option value="0.8">Small (0.8x)</option>
+                                <option value="1.0" selected>Normal (1.0x)</option>
+                                <option value="1.2">Large (1.2x)</option>
+                                <option value="1.5">Larger (1.5x)</option>
+                                <option value="2.0">Extra Large (2.0x)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="button secondary" id="settings-cancel">Cancel</button>
+                <button class="button primary" id="settings-save">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Focus Session Modal -->
+    <div class="modal" id="focus-session-modal" role="dialog" aria-labelledby="focus-session-title" aria-modal="true">
+        <div class="modal-backdrop" tabindex="-1"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="focus-session-title">Start Focus Session</h2>
+                <button class="modal-close" aria-label="Close focus session setup">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 4l8 8M12 4l-8 8"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="focus-session-options">
+                    <div class="session-type-grid">
+                        <button class="session-type-btn active" data-duration="1500">
+                            <div class="session-icon">🍅</div>
+                            <div class="session-label">Pomodoro</div>
+                            <div class="session-duration">25 minutes</div>
+                        </button>
+                        
+                        <button class="session-type-btn" data-duration="3600">
+                            <div class="session-icon">📖</div>
+                            <div class="session-label">Deep Work</div>
+                            <div class="session-duration">1 hour</div>
+                        </button>
+                        
+                        <button class="session-type-btn" data-duration="600">
+                            <div class="session-icon">⚡</div>
+                            <div class="session-label">Sprint</div>
+                            <div class="session-duration">10 minutes</div>
+                        </button>
+                        
+                        <button class="session-type-btn" data-duration="custom">
+                            <div class="session-icon">⏱️</div>
+                            <div class="session-label">Custom</div>
+                            <div class="session-duration">Set time</div>
+                        </button>
+                    </div>
+                    
+                    <div class="custom-duration" id="custom-duration" style="display: none;">
+                        <label for="custom-minutes">Duration (minutes)</label>
+                        <input type="number" id="custom-minutes" class="setting-input" min="5" max="180" value="25">
+                    </div>
+                    
+                    <div class="session-goal">
+                        <label for="session-goal-input">Optional Goal</label>
+                        <input type="text" id="session-goal-input" class="setting-input" placeholder="e.g., Write 500 words, Finish chapter 3">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="button secondary" id="focus-cancel">Cancel</button>
+                <button class="button primary" id="focus-start">Start Session</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="/scripts/app.js"></script>
+    
+    <!-- Accessibility enhancements -->
+    <div class="screen-reader-only" aria-live="polite" id="sr-announcements"></div>
+    
+    <!-- Skip links for keyboard navigation -->
+    <a class="skip-link" href="#main-editor">Skip to main content</a>
+    <a class="skip-link" href="#project-sidebar">Skip to navigation</a>
+</body>
+</html>

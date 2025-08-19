@@ -1,0 +1,693 @@
+/**
+ * WriteMagic Accessibility Styles
+ * 
+ * Comprehensive accessibility support for inclusive writing experience
+ */
+
+/* ==================== FOCUS MANAGEMENT ==================== */
+
+/* Enhanced focus indicators */
+*:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-base);
+}
+
+/* Special focus styles for interactive elements */
+button:focus-visible,
+.button:focus-visible,
+.icon-button:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 5px var(--color-focus-ring);
+}
+
+/* Input focus styles */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
+    box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+/* Writing editor special focus */
+.writing-editor:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+    box-shadow: inset 0 0 0 3px var(--color-focus-ring);
+}
+
+/* Modal focus trap */
+.modal.active {
+    contain: focus;
+}
+
+/* Focus within for complex components */
+.pane:focus-within {
+    border-color: var(--color-primary-light);
+}
+
+.project-item:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+/* Skip focus for decorative elements */
+.decorative {
+    pointer-events: none;
+    user-select: none;
+}
+
+/* ==================== KEYBOARD NAVIGATION ==================== */
+
+/* Keyboard navigation helpers */
+.keyboard-only *:focus {
+    outline: 3px solid var(--color-focus) !important;
+    outline-offset: 2px !important;
+}
+
+/* Enhanced keyboard navigation for complex UI */
+.workspace-panes[data-keyboard-navigation="true"] .pane.active {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+/* Keyboard shortcuts hints */
+.keyboard-shortcut {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
+    background-color: var(--color-background-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-2);
+    color: var(--color-text-secondary);
+    margin-left: var(--space-2);
+}
+
+/* Tab sequence indicators */
+[tabindex]:not([tabindex="-1"]) {
+    position: relative;
+}
+
+/* Focus management for modals */
+.modal-content:focus {
+    outline: none;
+}
+
+.modal.active .modal-content {
+    contain: focus;
+}
+
+/* ==================== SCREEN READER SUPPORT ==================== */
+
+/* Screen reader only content */
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Show on focus for screen reader users */
+.sr-only-focusable:focus {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    padding: var(--space-2) var(--space-4) !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    white-space: normal !important;
+    border: 1px solid var(--color-focus) !important;
+    background-color: var(--color-background-elevated) !important;
+    color: var(--color-text) !important;
+    z-index: var(--z-tooltip);
+}
+
+/* Enhanced ARIA live regions */
+[aria-live="polite"] {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+/* Status announcements */
+.status-announcement {
+    position: absolute !important;
+    left: -10000px !important;
+    top: auto !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+}
+
+/* Screen reader friendly loading states */
+.loading[aria-label]::after {
+    content: attr(aria-label);
+    position: absolute;
+    left: -10000px;
+}
+
+/* Enhanced form labels */
+.form-group label {
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+}
+
+.form-group .required::after {
+    content: " *";
+    color: var(--color-error);
+    font-weight: var(--font-weight-bold);
+}
+
+/* Error message styling */
+.error-message {
+    color: var(--color-error);
+    font-size: var(--font-size-sm);
+    margin-top: var(--space-1);
+}
+
+.form-input[aria-invalid="true"] {
+    border-color: var(--color-error);
+}
+
+.form-input[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* ==================== HIGH CONTRAST MODE SUPPORT ==================== */
+
+@media (prefers-contrast: high) {
+    :root {
+        --color-primary: #0000ff;
+        --color-primary-hover: #000080;
+        --color-focus: #ff0000;
+        --color-error: #cc0000;
+        --color-success: #008000;
+        --color-warning: #ff8800;
+    }
+    
+    /* Enhanced borders in high contrast */
+    .button,
+    .form-input,
+    .form-textarea,
+    .form-select,
+    .pane,
+    .modal-content {
+        border-width: 2px !important;
+    }
+    
+    /* Remove subtle backgrounds */
+    .card,
+    .metric-card {
+        background-color: var(--color-background) !important;
+        border: 2px solid var(--color-border) !important;
+    }
+    
+    /* High contrast focus */
+    *:focus-visible {
+        outline: 3px solid var(--color-focus) !important;
+        outline-offset: 2px !important;
+        background-color: var(--color-background) !important;
+    }
+    
+    /* Text emphasis */
+    .text-muted {
+        color: var(--color-text-secondary) !important;
+    }
+    
+    /* Remove gradients and effects */
+    .loading-screen {
+        background: var(--color-primary) !important;
+    }
+    
+    .button.primary {
+        background-color: var(--color-primary) !important;
+        color: var(--color-text-inverse) !important;
+    }
+}
+
+/* ==================== REDUCED MOTION SUPPORT ==================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    
+    /* Remove motion from loading states */
+    .loading-bar,
+    .progress-indeterminate .progress-bar,
+    .skeleton,
+    .spinning {
+        animation: none !important;
+    }
+    
+    /* Disable parallax and transform effects */
+    .modal-content {
+        transform: none !important;
+        animation: none !important;
+    }
+    
+    /* Static focus states */
+    .focus-mode .app-header,
+    .focus-mode .layout-toolbar,
+    .focus-mode .analytics-panel,
+    .focus-mode .project-sidebar {
+        transition: none !important;
+    }
+    
+    /* Remove hover transforms */
+    .button:hover,
+    .card:hover,
+    .suggestion-chip:hover {
+        transform: none !important;
+    }
+}
+
+/* ==================== FONT SIZE PREFERENCES ==================== */
+
+/* Respect user's font size preferences */
+@media (prefers-reduced-data: reduce) {
+    /* Simplified styles for reduced data usage */
+    .loading-screen {
+        background: var(--color-primary) !important;
+    }
+    
+    .card,
+    .modal-content {
+        box-shadow: none !important;
+    }
+}
+
+/* ==================== COLOR BLINDNESS SUPPORT ==================== */
+
+/* Enhanced color differentiation */
+.status-indicator.online .status-dot::before {
+    content: "✓";
+    position: absolute;
+    font-size: 8px;
+    color: var(--color-text-inverse);
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.status-indicator.offline .status-dot::before {
+    content: "✗";
+    position: absolute;
+    font-size: 8px;
+    color: var(--color-text-inverse);
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.status-indicator.saving .status-dot::before {
+    content: "⟳";
+    position: absolute;
+    font-size: 8px;
+    color: var(--color-text-inverse);
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Pattern-based differentiation for charts/graphs */
+.progress-bar[data-type="success"] {
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.2) 2px,
+        rgba(255, 255, 255, 0.2) 4px
+    );
+}
+
+.progress-bar[data-type="warning"] {
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.2) 2px,
+        rgba(255, 255, 255, 0.2) 4px
+    );
+}
+
+.progress-bar[data-type="error"] {
+    background-image: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.2) 2px,
+        rgba(255, 255, 255, 0.2) 4px
+    );
+}
+
+/* ==================== TOUCH ACCESSIBILITY ==================== */
+
+/* Enhanced touch targets */
+@media (pointer: coarse) {
+    /* Minimum touch target size */
+    button,
+    .button,
+    .icon-button,
+    .tab-btn,
+    .layout-btn,
+    input[type="checkbox"],
+    input[type="radio"] {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* Increased spacing for touch */
+    .layout-buttons {
+        gap: var(--space-3);
+    }
+    
+    .session-controls {
+        gap: var(--space-4);
+    }
+    
+    .ai-suggestions {
+        gap: var(--space-3);
+    }
+    
+    /* Touch-friendly dropdowns */
+    .form-select {
+        padding: var(--space-4);
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    /* Swipe indicators */
+    .swipe-indicator {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--color-text-muted);
+        font-size: var(--font-size-xs);
+        pointer-events: none;
+    }
+    
+    .swipe-indicator.left {
+        left: var(--space-2);
+    }
+    
+    .swipe-indicator.right {
+        right: var(--space-2);
+    }
+}
+
+/* ==================== VOICE CONTROL SUPPORT ==================== */
+
+/* Voice control landmarks */
+[role="button"],
+[role="link"],
+[role="menuitem"] {
+    speak: normal;
+}
+
+[aria-hidden="true"] {
+    speak: none;
+}
+
+/* Enhanced voice labels */
+.voice-label {
+    position: absolute !important;
+    left: -10000px !important;
+    top: auto !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+}
+
+/* ==================== COGNITIVE ACCESSIBILITY ==================== */
+
+/* Simplified UI mode */
+.simple-ui {
+    --space-4: var(--space-6);
+    --font-size-base: var(--font-size-lg);
+    --line-height-relaxed: 2;
+}
+
+.simple-ui .button {
+    padding: var(--space-4) var(--space-6);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+}
+
+.simple-ui .writing-editor {
+    font-size: var(--font-size-xl);
+    line-height: 2;
+}
+
+/* Clear language helpers */
+.help-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-top: var(--space-1);
+    line-height: var(--line-height-relaxed);
+}
+
+.instruction {
+    background-color: var(--color-background-secondary);
+    border-left: 3px solid var(--color-primary);
+    padding: var(--space-3) var(--space-4);
+    margin: var(--space-4) 0;
+    font-size: var(--font-size-sm);
+    border-radius: var(--radius-base);
+}
+
+/* Error prevention */
+.confirmation-needed {
+    background-color: var(--color-warning-light);
+    border: 1px solid var(--color-warning);
+    color: var(--color-warning);
+}
+
+/* ==================== DYSLEXIA SUPPORT ==================== */
+
+.dyslexia-friendly {
+    /* OpenDyslexic font if available */
+    --font-family-serif: 'OpenDyslexic', 'Comic Sans MS', cursive, serif;
+    --font-family-sans: 'OpenDyslexic', 'Comic Sans MS', cursive, sans-serif;
+    
+    /* Enhanced spacing */
+    --line-height-relaxed: 1.8;
+    --editor-line-height: 1.8;
+    letter-spacing: 0.02em;
+    word-spacing: 0.1em;
+}
+
+.dyslexia-friendly .writing-editor {
+    font-family: var(--font-family-serif);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0.02em;
+    word-spacing: 0.1em;
+}
+
+/* Colored overlays */
+.reading-ruler {
+    position: fixed;
+    width: 100%;
+    height: 3px;
+    background-color: var(--color-primary);
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: var(--z-tooltip);
+    transition: top 0.1s ease;
+}
+
+/* ==================== VISUAL IMPAIRMENT SUPPORT ==================== */
+
+/* Enhanced contrast mode */
+.high-contrast {
+    --color-text: #000000;
+    --color-background: #ffffff;
+    --color-primary: #0000ff;
+    --color-error: #ff0000;
+    --color-success: #00aa00;
+    --color-border: #000000;
+}
+
+.high-contrast.dark {
+    --color-text: #ffffff;
+    --color-background: #000000;
+    --color-primary: #00ffff;
+    --color-error: #ff6666;
+    --color-success: #66ff66;
+    --color-border: #ffffff;
+}
+
+/* Large text mode */
+.large-text {
+    --font-size-base: 1.25rem;
+    --font-size-sm: 1.125rem;
+    --font-size-xs: 1rem;
+    --editor-font-size: 1.5rem;
+}
+
+.extra-large-text {
+    --font-size-base: 1.5rem;
+    --font-size-sm: 1.25rem;
+    --font-size-xs: 1.125rem;
+    --editor-font-size: 1.75rem;
+}
+
+/* ==================== SEIZURE PREVENTION ==================== */
+
+/* Disable flashing animations */
+@media (prefers-reduced-motion: reduce) {
+    .pulse,
+    .blink,
+    .flash {
+        animation: none !important;
+    }
+}
+
+/* Safe animation boundaries */
+.safe-animation {
+    animation-duration: 0.3s !important;
+    animation-iteration-count: 3 !important;
+}
+
+/* ==================== CUSTOMIZABLE INTERFACE ==================== */
+
+/* User preference overrides */
+.user-preferences-applied {
+    /* These will be set via JavaScript based on user preferences */
+}
+
+/* Accessibility settings panel */
+.accessibility-panel {
+    padding: var(--space-6);
+    background-color: var(--color-background-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    margin: var(--space-4) 0;
+}
+
+.accessibility-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-base);
+    margin-bottom: var(--space-2);
+    cursor: pointer;
+    transition: var(--transition-colors);
+}
+
+.accessibility-toggle:hover {
+    background-color: var(--color-background-secondary);
+}
+
+.accessibility-toggle.active {
+    background-color: var(--color-primary-light);
+    border-color: var(--color-primary);
+}
+
+/* ==================== INTERNATIONAL ACCESSIBILITY ==================== */
+
+/* RTL language support */
+.rtl {
+    direction: rtl;
+    text-align: right;
+}
+
+.rtl .app-header {
+    flex-direction: row-reverse;
+}
+
+.rtl .project-sidebar {
+    left: auto;
+    right: 0;
+    border-right: none;
+    border-left: 1px solid var(--color-border);
+}
+
+.rtl .document-list {
+    border-left: none;
+    border-right: 2px solid var(--color-border-light);
+    margin-left: 0;
+    margin-right: var(--space-3);
+    padding-left: 0;
+    padding-right: var(--space-4);
+}
+
+/* Language-specific font stacks */
+.lang-ar {
+    font-family: 'Noto Sans Arabic', 'Arial Unicode MS', sans-serif;
+}
+
+.lang-zh {
+    font-family: 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.lang-ja {
+    font-family: 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+}
+
+.lang-ko {
+    font-family: 'Noto Sans CJK KR', 'Malgun Gothic', 'Apple Gothic', sans-serif;
+}
+
+/* ==================== ERROR STATES AND FEEDBACK ==================== */
+
+/* Accessible error states */
+.error-state {
+    border: 2px solid var(--color-error);
+    background-color: var(--color-error-light);
+    position: relative;
+}
+
+.error-state::before {
+    content: "⚠";
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    color: var(--color-error);
+    font-weight: bold;
+    z-index: 1;
+}
+
+/* Success feedback */
+.success-state {
+    border: 2px solid var(--color-success);
+    background-color: var(--color-success-light);
+}
+
+.success-state::after {
+    content: "✓";
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    color: var(--color-success);
+    font-weight: bold;
+    z-index: 1;
+}
+
+/* Loading state announcements */
+.loading-announcement::after {
+    content: "Loading...";
+    position: absolute;
+    left: -10000px;
+}
+
+.loading-complete-announcement::after {
+    content: "Content loaded successfully";
+    position: absolute;
+    left: -10000px;
+}

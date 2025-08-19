@@ -13,6 +13,7 @@ jemalloc = ["tikv-jemallocator", "tikv-jemalloc-ctl"]
 file-logging = ["tracing-appender"]
 opentelemetry = ["tracing-opentelemetry"]
 portable_simd = []
+wasm = ["getrandom/js"]
 
 [dependencies]
 # Async
@@ -59,6 +60,9 @@ num_cpus.workspace = true
 crossbeam.workspace = true
 rayon.workspace = true
 atty.workspace = true
+
+# WASM dependencies (optional)
+getrandom = { workspace = true, optional = true }
 
 # Optional features
 tikv-jemallocator = { workspace = true, optional = true }

@@ -1,0 +1,27 @@
+[build]
+# Target to build for (web, bundler, nodejs)
+target = "web"
+
+# Output directory
+out-dir = "pkg"
+
+# Whether to run wasm-opt
+run-wasm-opt = true
+
+# wasm-opt optimization level
+wasm-opt = ["-Os", "--enable-mutable-globals"]
+
+[build.dev]
+# Development build settings
+run-wasm-opt = false
+debug = true
+
+[build.profiling]
+# Profiling build settings
+debug = true
+run-wasm-opt = true
+wasm-opt = ["-O", "--enable-mutable-globals", "--debug-info"]
+
+[profile.release]
+# Release profile optimizations
+wee_alloc = false

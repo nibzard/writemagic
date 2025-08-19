@@ -1,0 +1,87 @@
+[package]
+name = "writemagic-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+# Core WriteMagic dependencies
+writemagic-shared = { path = "../shared", features = ["wasm"] }
+writemagic-writing = { path = "../writing" }
+writemagic-ai = { path = "../ai" }
+writemagic-project = { path = "../project" }
+
+# WASM bindings
+wasm-bindgen = { workspace = true, features = ["serde-serialize"] }
+wasm-bindgen-futures = { workspace = true }
+js-sys = { workspace = true }
+web-sys = { workspace = true, features = [
+    "console",
+    "IdbDatabase", 
+    "IdbObjectStore",
+    "IdbTransaction", 
+    "IdbTransactionMode",
+    "IdbRequest",
+    "IdbOpenDbRequest", 
+    "IdbKeyRange",
+    "IdbCursor",
+    "IdbCursorDirection",
+    "IdbIndex",
+    "IdbObjectStoreParameters",
+    "IdbIndexParameters",
+    "Window",
+    "Navigator",
+    "Storage",
+    "Event",
+    "EventTarget"
+]
+
+# Error handling for WASM
+console_error_panic_hook = { workspace = true, optional = true }
+
+# Async runtime for WASM
+tokio = { workspace = true, features = ["rt", "macros", "time", "sync"] }
+futures = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-wasm-bindgen = "0.6"
+
+# UUID generation for WASM
+uuid = { workspace = true, features = ["v4", "serde", "js"] }
+
+# Time handling for WASM
+chrono = { workspace = true, features = ["serde", "wasmbind"] }
+
+# Random number generation for WASM
+getrandom = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging for WASM
+log = { workspace = true }
+console_log = "1.0"
+
+[build-dependencies]
+chrono = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Os", "--enable-mutable-globals"]
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false

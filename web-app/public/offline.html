@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5">
+    <title>WriteMagic - You're Offline</title>
+    
+    <style>
+        /* Inline styles for offline page - no external dependencies */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 
+                         'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: #374151;
+        }
+        
+        .offline-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+                        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 500px;
+            width: 100%;
+            padding: 3rem;
+            text-align: center;
+            animation: slideUp 0.6s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .offline-icon {
+            font-size: 5rem;
+            margin-bottom: 1.5rem;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #1f2937;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            color: #6b7280;
+            margin-bottom: 2rem;
+            line-height: 1.5;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            font-weight: 500;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #f59e0b;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            animation: blink 1.5s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .offline-features {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+        
+        .offline-features h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #374151;
+            text-align: center;
+        }
+        
+        .feature-list {
+            list-style: none;
+            space-y: 0.5rem;
+        }
+        
+        .feature-list li {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+            color: #4b5563;
+        }
+        
+        .feature-list li:before {
+            content: "✓";
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .button:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+        }
+        
+        .button.secondary {
+            background: #6b7280;
+        }
+        
+        .button.secondary:hover {
+            background: #4b5563;
+            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+        }
+        
+        .network-status {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #f3f4f6;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+        
+        .network-status.online {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        @media (max-width: 480px) {
+            .offline-container {
+                padding: 2rem 1.5rem;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .offline-icon {
+                font-size: 4rem;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon">📝</div>
+        <h1>You're Offline</h1>
+        <p class="subtitle">WriteMagic isn't available right now, but don't worry - your work is safe and some features still work offline.</p>
+        
+        <div class="status-indicator">
+            <div class="status-dot"></div>
+            <span id="connection-status">No internet connection</span>
+        </div>
+        
+        <div class="offline-features">
+            <h3>What works offline:</h3>
+            <ul class="feature-list">
+                <li>View and edit your cached documents</li>
+                <li>Use basic writing tools and formatting</li>
+                <li>Access recently viewed content</li>
+                <li>Auto-save changes locally</li>
+                <li>View your writing analytics</li>
+            </ul>
+        </div>
+        
+        <div class="button-group">
+            <button class="button" onclick="tryReconnect()">
+                <span>🔄</span>
+                Try Again
+            </button>
+            <a href="/" class="button secondary">
+                <span>📝</span>
+                Open App Anyway
+            </a>
+        </div>
+        
+        <div class="network-status" id="network-status">
+            Checking connection status...
+        </div>
+    </div>
+
+    <script>
+        // Enhanced offline page with network monitoring
+        let isOnline = navigator.onLine;
+        let retryCount = 0;
+        const maxRetries = 5;
+        
+        // Update UI based on connection status
+        function updateConnectionStatus(online, quality = 'unknown') {
+            const statusElement = document.getElementById('connection-status');
+            const networkElement = document.getElementById('network-status');
+            const container = document.querySelector('.offline-container');
+            
+            if (online) {
+                statusElement.textContent = 'Connection restored!';
+                networkElement.textContent = `Online - Network quality: ${quality}`;
+                networkElement.className = 'network-status online';
+                
+                // Auto-redirect after showing success
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                statusElement.textContent = 'No internet connection';
+                networkElement.textContent = `Offline - Will retry automatically (${retryCount}/${maxRetries})`;
+                networkElement.className = 'network-status';
+            }
+        }
+        
+        // Try to reconnect
+        async function tryReconnect() {
+            const button = document.querySelector('.button');
+            const originalText = button.innerHTML;
+            
+            button.innerHTML = '<span>⏳</span> Checking...';
+            button.disabled = true;
+            
+            try {
+                // Test connection with a simple request
+                const response = await fetch('/', { 
+                    method: 'HEAD',
+                    cache: 'no-cache'
+                });
+                
+                if (response.ok) {
+                    button.innerHTML = '<span>✅</span> Connected!';
+                    updateConnectionStatus(true);
+                    return;
+                }
+            } catch (error) {
+                console.log('Connection test failed:', error);
+            }
+            
+            // Connection failed
+            retryCount++;
+            button.innerHTML = '<span>❌</span> Still offline';
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }, 2000);
+        }
+        
+        // Auto-retry connection periodically
+        function autoRetry() {
+            if (!isOnline && retryCount < maxRetries) {
+                tryReconnect();
+            }
+        }
+        
+        // Listen for online/offline events
+        window.addEventListener('online', () => {
+            isOnline = true;
+            retryCount = 0;
+            updateConnectionStatus(true);
+        });
+        
+        window.addEventListener('offline', () => {
+            isOnline = false;
+            updateConnectionStatus(false);
+        });
+        
+        // Listen for Service Worker messages
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', event => {
+                const { data } = event;
+                
+                if (data && data.type === 'NETWORK_STATUS') {
+                    isOnline = data.isOnline;
+                    updateConnectionStatus(data.isOnline, data.quality);
+                }
+            });
+        }
+        
+        // Initial status update
+        updateConnectionStatus(isOnline);
+        
+        // Set up auto-retry timer
+        setInterval(autoRetry, 10000); // Every 10 seconds
+        
+        // Page visibility change - retry when page becomes visible
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && !isOnline) {
+                setTimeout(tryReconnect, 1000);
+            }
+        });
+    </script>
+</body>
+</html>

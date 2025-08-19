@@ -1,0 +1,277 @@
+/**
+ * WriteMagic CSS Variables
+ * 
+ * Design system variables for consistent theming and spacing
+ */
+
+:root {
+    /* Colors - Light Theme */
+    --color-primary: #4f46e5;
+    --color-primary-hover: #4338ca;
+    --color-primary-light: #e0e7ff;
+    --color-primary-dark: #3730a3;
+    
+    --color-secondary: #7c3aed;
+    --color-secondary-hover: #6d28d9;
+    --color-secondary-light: #ede9fe;
+    --color-secondary-dark: #5b21b6;
+    
+    --color-success: #059669;
+    --color-success-light: #d1fae5;
+    --color-warning: #d97706;
+    --color-warning-light: #fef3c7;
+    --color-error: #dc2626;
+    --color-error-light: #fee2e2;
+    
+    --color-text: #1f2937;
+    --color-text-secondary: #6b7280;
+    --color-text-muted: #9ca3af;
+    --color-text-inverse: #ffffff;
+    
+    --color-background: #ffffff;
+    --color-background-secondary: #f9fafb;
+    --color-background-tertiary: #f3f4f6;
+    --color-background-elevated: #ffffff;
+    
+    --color-border: #e5e7eb;
+    --color-border-light: #f3f4f6;
+    --color-border-dark: #d1d5db;
+    
+    --color-focus: #3b82f6;
+    --color-focus-ring: rgba(59, 130, 246, 0.3);
+    
+    /* Surface colors for different elevations */
+    --color-surface-1: #ffffff;
+    --color-surface-2: #fefefe;
+    --color-surface-3: #fdfdfd;
+    --color-surface-4: #fcfcfc;
+    
+    /* AI Assistant specific colors */
+    --color-ai-primary: #7c3aed;
+    --color-ai-background: #faf5ff;
+    --color-ai-border: #e9d5ff;
+    --color-ai-text: #581c87;
+    
+    /* Status colors */
+    --color-online: #10b981;
+    --color-offline: #ef4444;
+    --color-idle: #f59e0b;
+    --color-saving: #3b82f6;
+    --color-saved: #10b981;
+    
+    /* Typography */
+    --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    --font-family-serif: 'Charter', 'Bitstream Charter', 'Sitka Text', Cambria, serif;
+    
+    --font-size-xs: 0.75rem;    /* 12px */
+    --font-size-sm: 0.875rem;   /* 14px */
+    --font-size-base: 1rem;     /* 16px */
+    --font-size-lg: 1.125rem;   /* 18px */
+    --font-size-xl: 1.25rem;    /* 20px */
+    --font-size-2xl: 1.5rem;    /* 24px */
+    --font-size-3xl: 1.875rem;  /* 30px */
+    --font-size-4xl: 2.25rem;   /* 36px */
+    
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.6;
+    --line-height-loose: 2;
+    
+    /* Spacing */
+    --space-px: 1px;
+    --space-0: 0;
+    --space-1: 0.25rem;   /* 4px */
+    --space-2: 0.5rem;    /* 8px */
+    --space-3: 0.75rem;   /* 12px */
+    --space-4: 1rem;      /* 16px */
+    --space-5: 1.25rem;   /* 20px */
+    --space-6: 1.5rem;    /* 24px */
+    --space-8: 2rem;      /* 32px */
+    --space-10: 2.5rem;   /* 40px */
+    --space-12: 3rem;     /* 48px */
+    --space-16: 4rem;     /* 64px */
+    --space-20: 5rem;     /* 80px */
+    --space-24: 6rem;     /* 96px */
+    
+    /* Border radius */
+    --radius-none: 0;
+    --radius-sm: 0.125rem;    /* 2px */
+    --radius-base: 0.25rem;   /* 4px */
+    --radius-md: 0.375rem;    /* 6px */
+    --radius-lg: 0.5rem;      /* 8px */
+    --radius-xl: 0.75rem;     /* 12px */
+    --radius-2xl: 1rem;       /* 16px */
+    --radius-3xl: 1.5rem;     /* 24px */
+    --radius-full: 9999px;
+    
+    /* Shadows */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+    
+    /* Focus shadows */
+    --shadow-focus: 0 0 0 3px var(--color-focus-ring);
+    
+    /* Transitions */
+    --transition-fast: 0.1s ease;
+    --transition-base: 0.2s ease;
+    --transition-slow: 0.3s ease;
+    --transition-slower: 0.5s ease;
+    
+    --transition-all: all 0.2s ease;
+    --transition-colors: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+    --transition-opacity: opacity 0.2s ease;
+    --transition-transform: transform 0.2s ease;
+    
+    /* Layout dimensions */
+    --header-height: 3.5rem;        /* 56px */
+    --sidebar-width: 16rem;         /* 256px */
+    --sidebar-width-collapsed: 3rem; /* 48px */
+    --toolbar-height: 2.5rem;       /* 40px */
+    --analytics-height: 5rem;       /* 80px */
+    --analytics-height-expanded: 12rem; /* 192px */
+    
+    /* Editor specific */
+    --editor-font-size: 1rem;
+    --editor-line-height: 1.6;
+    --editor-padding: 1.5rem;
+    --editor-max-width: 45rem;      /* ~720px for optimal reading */
+    
+    /* Pane dimensions */
+    --pane-min-width: 16rem;        /* 256px */
+    --pane-header-height: 2.5rem;   /* 40px */
+    --pane-border-width: 1px;
+    
+    /* Modal dimensions */
+    --modal-max-width: 32rem;       /* 512px */
+    --modal-max-height: 90vh;
+    
+    /* Animation timing functions */
+    --ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
+    --ease-in-cubic: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+    --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
+    --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    
+    /* Z-index layers */
+    --z-dropdown: 1000;
+    --z-sticky: 1020;
+    --z-fixed: 1030;
+    --z-modal-backdrop: 1040;
+    --z-modal: 1050;
+    --z-popover: 1060;
+    --z-tooltip: 1070;
+    --z-toast: 1080;
+    
+    /* Breakpoints (for JavaScript usage) */
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+}
+
+/* Dark theme variables */
+:root.theme-dark {
+    --color-text: #f9fafb;
+    --color-text-secondary: #d1d5db;
+    --color-text-muted: #9ca3af;
+    --color-text-inverse: #111827;
+    
+    --color-background: #111827;
+    --color-background-secondary: #1f2937;
+    --color-background-tertiary: #374151;
+    --color-background-elevated: #1f2937;
+    
+    --color-border: #374151;
+    --color-border-light: #4b5563;
+    --color-border-dark: #6b7280;
+    
+    --color-surface-1: #1f2937;
+    --color-surface-2: #233044;
+    --color-surface-3: #273552;
+    --color-surface-4: #2b3a5f;
+    
+    --color-ai-background: #2d1b4e;
+    --color-ai-border: #553c9a;
+    --color-ai-text: #c4b5fd;
+    
+    /* Adjust shadows for dark theme */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+    --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* High contrast theme variables */
+:root.theme-high-contrast {
+    --color-primary: #0000ff;
+    --color-primary-hover: #000080;
+    
+    --color-text: #000000;
+    --color-text-secondary: #000000;
+    --color-background: #ffffff;
+    --color-background-secondary: #ffffff;
+    
+    --color-border: #000000;
+    --color-border-light: #000000;
+    
+    --shadow-xs: none;
+    --shadow-sm: none;
+    --shadow-base: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-xl: none;
+}
+
+/* High contrast dark theme */
+:root.theme-high-contrast.theme-dark {
+    --color-text: #ffffff;
+    --color-text-secondary: #ffffff;
+    --color-background: #000000;
+    --color-background-secondary: #000000;
+    
+    --color-border: #ffffff;
+    --color-border-light: #ffffff;
+}
+
+/* Custom properties for dynamic sizing */
+:root {
+    --content-width: min(100% - 2rem, 65ch);
+    --sidebar-collapsed: 0;
+    --analytics-collapsed: 1;
+}
+
+/* Media query based adjustments */
+@media (max-width: 768px) {
+    :root {
+        --sidebar-width: 100%;
+        --editor-padding: 1rem;
+        --header-height: 3rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --transition-fast: none;
+        --transition-base: none;
+        --transition-slow: none;
+        --transition-slower: none;
+        --transition-all: none;
+        --transition-colors: none;
+        --transition-opacity: none;
+        --transition-transform: none;
+    }
+}

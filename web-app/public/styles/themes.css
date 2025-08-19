@@ -1,0 +1,497 @@
+/**
+ * WriteMagic Theme Styles
+ * 
+ * Theme-specific styles and color mode implementations
+ */
+
+/* ==================== LIGHT THEME (DEFAULT) ==================== */
+
+.theme-light {
+    /* Already defined in variables.css as :root defaults */
+}
+
+/* ==================== DARK THEME ==================== */
+
+.theme-dark {
+    color-scheme: dark;
+}
+
+/* Dark theme editor adjustments */
+.theme-dark .writing-editor {
+    background-color: var(--color-background);
+    color: var(--color-text);
+    caret-color: var(--color-primary);
+}
+
+.theme-dark .writing-editor::placeholder {
+    color: var(--color-text-muted);
+}
+
+/* Dark theme scrollbars */
+.theme-dark .scrollbar-thin::-webkit-scrollbar-track {
+    background: var(--color-background-tertiary);
+}
+
+.theme-dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--color-border-light);
+}
+
+.theme-dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-secondary);
+}
+
+/* Dark theme loading screen */
+.theme-dark .loading-screen {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%);
+}
+
+/* Dark theme modal adjustments */
+.theme-dark .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+/* Dark theme AI message styling */
+.theme-dark .ai-message.ai-message {
+    background-color: var(--color-ai-background);
+    border-color: var(--color-ai-border);
+    color: var(--color-ai-text);
+}
+
+.theme-dark .ai-message.system-message {
+    background-color: var(--color-background-tertiary);
+    color: var(--color-text-secondary);
+}
+
+/* Dark theme form elements */
+.theme-dark .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%9ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
+
+/* ==================== HIGH CONTRAST THEME ==================== */
+
+.theme-high-contrast {
+    /* High contrast adjustments */
+}
+
+.theme-high-contrast .writing-editor {
+    border: 2px solid var(--color-border);
+}
+
+.theme-high-contrast .button {
+    border-width: 2px;
+    font-weight: var(--font-weight-semibold);
+}
+
+.theme-high-contrast .form-input,
+.theme-high-contrast .form-textarea,
+.theme-high-contrast .form-select {
+    border-width: 2px;
+}
+
+.theme-high-contrast .pane {
+    border-width: 2px;
+}
+
+.theme-high-contrast .modal-content {
+    border: 2px solid var(--color-border);
+}
+
+/* Remove subtle styling in high contrast mode */
+.theme-high-contrast .shadow-sm,
+.theme-high-contrast .shadow,
+.theme-high-contrast .shadow-md,
+.theme-high-contrast .shadow-lg {
+    box-shadow: none !important;
+}
+
+/* ==================== FOCUS MODE THEME ==================== */
+
+.focus-mode {
+    --color-background: #fefcf7;
+    --color-background-secondary: #faf8f3;
+    --color-text: #2d3748;
+    --editor-font-size: 1.125rem;
+    --editor-line-height: 1.8;
+}
+
+.theme-dark.focus-mode {
+    --color-background: #1a1a1a;
+    --color-background-secondary: #2d2d2d;
+    --color-text: #e2e8f0;
+}
+
+.focus-mode .app-header,
+.focus-mode .layout-toolbar,
+.focus-mode .analytics-panel {
+    opacity: 0.3;
+    transition: opacity 0.3s ease;
+}
+
+.focus-mode .app-header:hover,
+.focus-mode .layout-toolbar:hover,
+.focus-mode .analytics-panel:hover {
+    opacity: 1;
+}
+
+.focus-mode .project-sidebar {
+    opacity: 0.1;
+    transition: opacity 0.3s ease;
+}
+
+.focus-mode .project-sidebar:hover {
+    opacity: 1;
+}
+
+.focus-mode .writing-editor {
+    background: linear-gradient(135deg, var(--color-background) 0%, var(--color-background-secondary) 100%);
+}
+
+/* ==================== TYPEWRITER MODE ==================== */
+
+.typewriter-mode .writing-editor {
+    padding-top: 50vh;
+    padding-bottom: 50vh;
+    overflow-anchor: none;
+}
+
+.typewriter-mode .editor-container {
+    position: relative;
+}
+
+.typewriter-mode .editor-container::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background-color: var(--color-primary);
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ==================== WRITER THEMES ==================== */
+
+/* Minimal Theme - Clean and distraction-free */
+.theme-minimal {
+    --color-background: #ffffff;
+    --color-background-secondary: #fafafa;
+    --color-background-tertiary: #f5f5f5;
+    --color-text: #1a1a1a;
+    --color-text-secondary: #666666;
+    --color-text-muted: #999999;
+    --color-border: #e5e5e5;
+    --color-primary: #007acc;
+    --editor-font-size: 1.125rem;
+    --editor-line-height: 1.7;
+}
+
+.theme-minimal .app-header {
+    background-color: transparent;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.theme-minimal .layout-toolbar {
+    background-color: transparent;
+}
+
+.theme-minimal .project-sidebar {
+    background-color: var(--color-background);
+    border-right: 1px solid var(--color-border);
+}
+
+/* Warm Theme - Comfortable for long writing sessions */
+.theme-warm {
+    --color-background: #fdf6e3;
+    --color-background-secondary: #f7f0dc;
+    --color-background-tertiary: #eee8d5;
+    --color-text: #586e75;
+    --color-text-secondary: #657b83;
+    --color-text-muted: #93a1a1;
+    --color-border: #e5dcc6;
+    --color-primary: #cb4b16;
+    --editor-font-size: 1.125rem;
+    --editor-line-height: 1.8;
+}
+
+/* Cold Theme - High contrast for clarity */
+.theme-cold {
+    --color-background: #f8fafc;
+    --color-background-secondary: #f1f5f9;
+    --color-background-tertiary: #e2e8f0;
+    --color-text: #0f172a;
+    --color-text-secondary: #334155;
+    --color-text-muted: #64748b;
+    --color-border: #cbd5e1;
+    --color-primary: #3b82f6;
+    --editor-font-size: 1rem;
+    --editor-line-height: 1.6;
+}
+
+/* Monospace Theme - For technical writing */
+.theme-monospace {
+    --font-family-sans: var(--font-family-mono);
+    --editor-font-size: 0.9rem;
+    --editor-line-height: 1.6;
+}
+
+.theme-monospace .writing-editor {
+    font-family: var(--font-family-mono);
+}
+
+.theme-monospace .document-title,
+.theme-monospace .project-title {
+    font-family: var(--font-family-mono);
+}
+
+/* Serif Theme - For literary writing */
+.theme-serif .writing-editor {
+    font-family: var(--font-family-serif);
+    font-size: 1.125rem;
+    line-height: 1.8;
+}
+
+/* ==================== SEASONAL THEMES ==================== */
+
+/* Spring Theme */
+.theme-spring {
+    --color-background: #fefffe;
+    --color-background-secondary: #f0fdf4;
+    --color-primary: #22c55e;
+    --color-secondary: #84cc16;
+}
+
+/* Summer Theme */
+.theme-summer {
+    --color-background: #fffbeb;
+    --color-background-secondary: #fef3c7;
+    --color-primary: #f59e0b;
+    --color-secondary: #f97316;
+}
+
+/* Autumn Theme */
+.theme-autumn {
+    --color-background: #fefaf0;
+    --color-background-secondary: #fed7aa;
+    --color-primary: #ea580c;
+    --color-secondary: #dc2626;
+}
+
+/* Winter Theme */
+.theme-winter {
+    --color-background: #f8fafc;
+    --color-background-secondary: #e2e8f0;
+    --color-primary: #3b82f6;
+    --color-secondary: #6366f1;
+}
+
+/* ==================== ACCESSIBILITY THEMES ==================== */
+
+/* Large text theme */
+.theme-large-text {
+    --font-size-xs: 0.9rem;
+    --font-size-sm: 1rem;
+    --font-size-base: 1.125rem;
+    --font-size-lg: 1.25rem;
+    --font-size-xl: 1.5rem;
+    --editor-font-size: 1.25rem;
+    --editor-line-height: 1.8;
+}
+
+/* Extra large text theme */
+.theme-extra-large-text {
+    --font-size-xs: 1rem;
+    --font-size-sm: 1.125rem;
+    --font-size-base: 1.25rem;
+    --font-size-lg: 1.5rem;
+    --font-size-xl: 1.75rem;
+    --editor-font-size: 1.5rem;
+    --editor-line-height: 2;
+}
+
+/* High contrast theme for accessibility */
+.theme-high-contrast-accessible {
+    --color-primary: #000000;
+    --color-primary-hover: #333333;
+    --color-text: #000000;
+    --color-text-secondary: #000000;
+    --color-background: #ffffff;
+    --color-background-secondary: #ffffff;
+    --color-background-tertiary: #f0f0f0;
+    --color-border: #000000;
+    --color-focus: #000000;
+}
+
+.theme-dark.theme-high-contrast-accessible {
+    --color-primary: #ffffff;
+    --color-primary-hover: #cccccc;
+    --color-text: #ffffff;
+    --color-text-secondary: #ffffff;
+    --color-background: #000000;
+    --color-background-secondary: #000000;
+    --color-background-tertiary: #1a1a1a;
+    --color-border: #ffffff;
+    --color-focus: #ffffff;
+}
+
+/* ==================== THEME TRANSITIONS ==================== */
+
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Disable transitions during theme switching to prevent flashing */
+.theme-switching * {
+    transition: none !important;
+}
+
+/* ==================== PRINT THEME ==================== */
+
+@media print {
+    .theme-light,
+    .theme-dark,
+    .theme-high-contrast {
+        --color-text: #000000 !important;
+        --color-background: #ffffff !important;
+        --color-background-secondary: #ffffff !important;
+        --color-border: #cccccc !important;
+    }
+    
+    .writing-editor {
+        font-family: 'Times New Roman', serif !important;
+        font-size: 12pt !important;
+        line-height: 1.5 !important;
+        color: #000000 !important;
+        background: #ffffff !important;
+    }
+}
+
+/* ==================== COLOR SCHEME MEDIA QUERIES ==================== */
+
+@media (prefers-color-scheme: dark) {
+    .theme-auto {
+        color-scheme: dark;
+    }
+    
+    .theme-auto,
+    :root:not([class*="theme-"]) {
+        --color-text: #f9fafb;
+        --color-text-secondary: #d1d5db;
+        --color-text-muted: #9ca3af;
+        --color-text-inverse: #111827;
+        
+        --color-background: #111827;
+        --color-background-secondary: #1f2937;
+        --color-background-tertiary: #374151;
+        --color-background-elevated: #1f2937;
+        
+        --color-border: #374151;
+        --color-border-light: #4b5563;
+        --color-border-dark: #6b7280;
+        
+        --color-surface-1: #1f2937;
+        --color-surface-2: #233044;
+        --color-surface-3: #273552;
+        --color-surface-4: #2b3a5f;
+        
+        --color-ai-background: #2d1b4e;
+        --color-ai-border: #553c9a;
+        --color-ai-text: #c4b5fd;
+    }
+}
+
+/* ==================== CONTRAST PREFERENCE ==================== */
+
+@media (prefers-contrast: high) {
+    :root {
+        --color-primary: #0000ff;
+        --color-primary-hover: #000080;
+        --color-border: #000000;
+        --color-focus: #ff0000;
+    }
+    
+    .theme-dark {
+        --color-primary: #00ffff;
+        --color-primary-hover: #66ffff;
+        --color-border: #ffffff;
+        --color-focus: #ffff00;
+    }
+}
+
+/* ==================== REDUCED MOTION ==================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-bar,
+    .ai-message,
+    .modal-content {
+        animation: none !important;
+    }
+    
+    .focus-mode .app-header,
+    .focus-mode .layout-toolbar,
+    .focus-mode .analytics-panel,
+    .focus-mode .project-sidebar {
+        transition: none !important;
+    }
+}
+
+/* ==================== THEME CUSTOMIZATION API ==================== */
+
+/* CSS custom properties for runtime theme customization */
+:root {
+    /* Allow JavaScript to override theme variables */
+    --theme-primary-hue: 234;
+    --theme-primary-saturation: 69%;
+    --theme-primary-lightness: 60%;
+    
+    --theme-background-hue: 0;
+    --theme-background-saturation: 0%;
+    --theme-background-lightness: 100%;
+    
+    --theme-font-scale: 1;
+    --theme-line-height-scale: 1;
+    --theme-spacing-scale: 1;
+}
+
+/* Dynamic color generation using HSL */
+.theme-custom {
+    --color-primary: hsl(
+        var(--theme-primary-hue),
+        var(--theme-primary-saturation),
+        var(--theme-primary-lightness)
+    );
+    --color-primary-hover: hsl(
+        var(--theme-primary-hue),
+        var(--theme-primary-saturation),
+        calc(var(--theme-primary-lightness) - 10%)
+    );
+    --color-primary-light: hsl(
+        var(--theme-primary-hue),
+        calc(var(--theme-primary-saturation) - 30%),
+        95%
+    );
+    --color-background: hsl(
+        var(--theme-background-hue),
+        var(--theme-background-saturation),
+        var(--theme-background-lightness)
+    );
+}
+
+/* Dynamic font sizing */
+.theme-custom {
+    --font-size-base: calc(1rem * var(--theme-font-scale));
+    --editor-font-size: calc(1rem * var(--theme-font-scale));
+    --line-height-relaxed: calc(1.6 * var(--theme-line-height-scale));
+    --editor-line-height: calc(1.6 * var(--theme-line-height-scale));
+}
+
+/* Dynamic spacing */
+.theme-custom {
+    --space-1: calc(0.25rem * var(--theme-spacing-scale));
+    --space-2: calc(0.5rem * var(--theme-spacing-scale));
+    --space-3: calc(0.75rem * var(--theme-spacing-scale));
+    --space-4: calc(1rem * var(--theme-spacing-scale));
+    --space-6: calc(1.5rem * var(--theme-spacing-scale));
+    --space-8: calc(2rem * var(--theme-spacing-scale));
+}

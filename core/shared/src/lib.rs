@@ -36,3 +36,10 @@ pub use simd_optimizations::{text_processing, numerical, validation as simd_vali
 pub use allocators::{ArenaAllocator, StackAllocator, PoolAllocator, alloc_in_thread_arena, reset_thread_arena};
 pub use advanced_performance::{MappedFile, MappedFileMut, fast_serialization, batch_processing, lock_free};
 pub use observability::{MetricsCollector, PerformanceProfiler, HealthChecker, tracing_setup};
+
+// WASM-specific exports
+#[cfg(target_arch = "wasm32")]
+pub mod wasm_utils;
+
+#[cfg(target_arch = "wasm32")]
+pub use wasm_utils::*;
