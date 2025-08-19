@@ -7,6 +7,13 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+jemalloc = ["tikv-jemallocator", "tikv-jemalloc-ctl"]
+file-logging = ["tracing-appender"]
+opentelemetry = ["tracing-opentelemetry"]
+portable_simd = []
+
 [dependencies]
 # Async
 async-trait.workspace = true
@@ -46,7 +53,21 @@ smallvec.workspace = true
 arrayvec.workspace = true
 bytes.workspace = true
 
+# Advanced performance
+memmap2.workspace = true
+num_cpus.workspace = true
+crossbeam.workspace = true
+rayon.workspace = true
+atty.workspace = true
+
+# Optional features
+tikv-jemallocator = { workspace = true, optional = true }
+tikv-jemalloc-ctl = { workspace = true, optional = true }
+tracing-appender = { workspace = true, optional = true }
+tracing-opentelemetry = { workspace = true, optional = true }
+
 [dev-dependencies]
+tempfile = "3.8"
 tokio-test = "0.4"
 criterion.workspace = true
 proptest.workspace = true
