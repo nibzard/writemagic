@@ -14,10 +14,11 @@ crate-type = ["cdylib", "staticlib"]
 # Core dependencies
 writemagic-shared = { path = "../../core/shared" }
 writemagic-writing = { path = "../../core/writing" }
-writemagic-ai = { path = "../../core/ai" }
-writemagic-project = { path = "../../core/project" }
-writemagic-version-control = { path = "../../core/version_control" }
-writemagic-agent = { path = "../../core/agent" }
+# Temporarily disabled to avoid OpenSSL issues
+# writemagic-ai = { path = "../../core/ai" }
+# writemagic-project = { path = "../../core/project" }
+# writemagic-version-control = { path = "../../core/version_control" }
+# writemagic-agent = { path = "../../core/agent" }
 
 # Async runtime
 tokio.workspace = true

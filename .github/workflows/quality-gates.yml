@@ -1,0 +1,363 @@
+name: Quality Gates
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+  MINIMUM_COVERAGE: 80
+  MAXIMUM_COMPLEXITY: 10
+
+jobs:
+  code-quality:
+    name: Code Quality Assessment
+    runs-on: ubuntu-latest
+    outputs:
+      quality-score: ${{ steps.quality.outputs.score }}
+      coverage-percentage: ${{ steps.coverage.outputs.percentage }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-quality-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libsqlite3-dev
+
+      - name: Install quality analysis tools
+        run: |
+          cargo install cargo-tarpaulin --locked
+          cargo install cargo-audit --locked
+          cargo install cargo-outdated --locked
+          cargo install cargo-machete --locked
+          pip3 install radon
+
+      - name: Run comprehensive linting
+        id: linting
+        run: |
+          echo "Running Clippy with strict rules..."
+          cargo clippy --workspace --all-targets --all-features -- -D warnings \
+            -D clippy::complexity \
+            -D clippy::perf \
+            -D clippy::style \
+            -D clippy::correctness \
+            -D clippy::suspicious \
+            -W clippy::pedantic \
+            > clippy-results.txt 2>&1
+          
+          echo "clippy_warnings=$(wc -l < clippy-results.txt)" >> $GITHUB_OUTPUT
+
+      - name: Check code formatting
+        run: |
+          cargo fmt --all -- --check
+
+      - name: Run security audit
+        run: |
+          cargo audit --json > audit-results.json
+          echo "security_vulnerabilities=$(jq '.vulnerabilities.found | length' audit-results.json)" >> $GITHUB_OUTPUT
+
+      - name: Check for outdated dependencies
+        run: |
+          cargo outdated --exit-code 1 --root-deps-only > outdated-deps.txt || echo "outdated_deps=true" >> $GITHUB_OUTPUT
+
+      - name: Find unused dependencies
+        run: |
+          cargo machete --with-metadata > unused-deps.txt
+
+      - name: Calculate code coverage
+        id: coverage
+        run: |
+          cargo tarpaulin --workspace --out Xml --out Json --timeout 300
+          COVERAGE=$(jq '.files | map(.summary.lines.percent) | add / length' tarpaulin-report.json)
+          echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
+          
+          if (( $(echo "$COVERAGE < $MINIMUM_COVERAGE" | bc -l) )); then
+            echo "❌ Coverage $COVERAGE% is below minimum threshold of $MINIMUM_COVERAGE%"
+            echo "coverage_passed=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Coverage $COVERAGE% meets minimum threshold"
+            echo "coverage_passed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Analyze code complexity
+        id: complexity
+        run: |
+          # Rust complexity analysis
+          find . -name "*.rs" -not -path "./target/*" | xargs -I {} sh -c 'echo "=== {} ===" && cargo expand --file {} | wc -l' > complexity-rust.txt
+          
+          # Generate complexity report
+          MAX_COMPLEXITY=0
+          while read -r line; do
+            if [[ $line =~ ^[0-9]+$ ]] && [ "$line" -gt "$MAX_COMPLEXITY" ]; then
+              MAX_COMPLEXITY=$line
+            fi
+          done < complexity-rust.txt
+          
+          echo "max_complexity=$MAX_COMPLEXITY" >> $GITHUB_OUTPUT
+          
+          if [ "$MAX_COMPLEXITY" -gt "$MAXIMUM_COMPLEXITY" ]; then
+            echo "❌ Code complexity $MAX_COMPLEXITY exceeds threshold of $MAXIMUM_COMPLEXITY"
+            echo "complexity_passed=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Code complexity $MAX_COMPLEXITY is within threshold"
+            echo "complexity_passed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Calculate technical debt
+        run: |
+          # Count TODO, FIXME, HACK comments
+          TODO_COUNT=$(grep -r "TODO\|FIXME\|HACK" --include="*.rs" --include="*.swift" --include="*.kt" . | wc -l)
+          echo "technical_debt_items=$TODO_COUNT" >> quality-metrics.txt
+          
+          # Calculate maintainability index (simplified)
+          LOC=$(find . -name "*.rs" -not -path "./target/*" | xargs wc -l | tail -1 | awk '{print $1}')
+          echo "lines_of_code=$LOC" >> quality-metrics.txt
+
+      - name: Generate quality score
+        id: quality
+        run: |
+          # Calculate composite quality score (0-100)
+          COVERAGE=${{ steps.coverage.outputs.percentage }}
+          CLIPPY_WARNINGS=${{ steps.linting.outputs.clippy_warnings }}
+          SECURITY_VULNS=${{ steps.linting.outputs.security_vulnerabilities }}
+          MAX_COMPLEXITY=${{ steps.complexity.outputs.max_complexity }}
+          
+          # Base score starts at 100
+          SCORE=100
+          
+          # Deduct points for issues
+          SCORE=$((SCORE - CLIPPY_WARNINGS * 2))
+          SCORE=$((SCORE - SECURITY_VULNS * 10))
+          SCORE=$((SCORE - (MAX_COMPLEXITY - MAXIMUM_COMPLEXITY) * 5))
+          
+          # Coverage bonus/penalty
+          if (( $(echo "$COVERAGE >= 90" | bc -l) )); then
+            SCORE=$((SCORE + 10))
+          elif (( $(echo "$COVERAGE < $MINIMUM_COVERAGE" | bc -l) )); then
+            SCORE=$((SCORE - 20))
+          fi
+          
+          # Ensure score is between 0-100
+          if [ "$SCORE" -lt 0 ]; then SCORE=0; fi
+          if [ "$SCORE" -gt 100 ]; then SCORE=100; fi
+          
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          echo "Quality Score: $SCORE/100"
+
+      - name: Upload quality artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-quality-results
+          path: |
+            clippy-results.txt
+            audit-results.json
+            tarpaulin-report.json
+            cobertura.xml
+            outdated-deps.txt
+            unused-deps.txt
+            quality-metrics.txt
+            complexity-rust.txt
+          retention-days: 30
+
+  mobile-quality:
+    name: Mobile Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-quality-${{ hashFiles('**/*.gradle*') }}
+
+      - name: Run Android linting
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew lintDebug ktlintCheck detekt
+
+      - name: Run Android unit tests with coverage
+        run: |
+          cd android
+          ./gradlew testDebugUnitTest jacocoTestReport
+
+      - name: Upload Android quality results
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-quality-results
+          path: |
+            android/app/build/reports/
+            android/app/build/test-results/
+          retention-days: 14
+
+  ios-quality:
+    name: iOS Code Quality
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: |
+          cd ios
+          swiftlint lint --reporter json > swiftlint-results.json
+
+      - name: Run iOS tests with coverage
+        run: |
+          cd ios
+          xcodebuild test -project WriteMagic.xcodeproj \
+            -scheme WriteMagic \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -enableCodeCoverage YES
+
+      - name: Upload iOS quality results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-quality-results
+          path: |
+            ios/swiftlint-results.json
+            ios/build/Logs/Test/
+          retention-days: 14
+
+  quality-gate-check:
+    name: Quality Gate Validation
+    runs-on: ubuntu-latest
+    needs: [code-quality, mobile-quality, ios-quality]
+    steps:
+      - name: Download quality artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: quality-results/
+
+      - name: Evaluate quality gates
+        id: gates
+        run: |
+          QUALITY_SCORE=${{ needs.code-quality.outputs.quality-score }}
+          COVERAGE=${{ needs.code-quality.outputs.coverage-percentage }}
+          
+          echo "Quality Score: $QUALITY_SCORE/100"
+          echo "Coverage: $COVERAGE%"
+          
+          # Define quality gates
+          MINIMUM_QUALITY_SCORE=70
+          
+          GATES_PASSED=true
+          
+          if [ "$QUALITY_SCORE" -lt "$MINIMUM_QUALITY_SCORE" ]; then
+            echo "❌ Quality gate FAILED: Score $QUALITY_SCORE < $MINIMUM_QUALITY_SCORE"
+            GATES_PASSED=false
+          fi
+          
+          if (( $(echo "$COVERAGE < $MINIMUM_COVERAGE" | bc -l) )); then
+            echo "❌ Quality gate FAILED: Coverage $COVERAGE% < $MINIMUM_COVERAGE%"
+            GATES_PASSED=false
+          fi
+          
+          if [ "$GATES_PASSED" = true ]; then
+            echo "✅ All quality gates PASSED"
+            echo "gates_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Quality gates FAILED"
+            echo "gates_passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Generate quality report
+        run: |
+          cat > quality-report.md << EOF
+          # Code Quality Report
+          
+          ## Overall Quality Score: ${{ needs.code-quality.outputs.quality-score }}/100
+          
+          ## Quality Metrics
+          
+          - **Code Coverage**: ${{ needs.code-quality.outputs.coverage-percentage }}%
+          - **Quality Gates**: ${{ steps.gates.outputs.gates_passed == 'true' && '✅ PASSED' || '❌ FAILED' }}
+          
+          ## Platform Results
+          
+          - **Rust Core**: ${{ needs.code-quality.result }}
+          - **Android**: ${{ needs.mobile-quality.result }}
+          - **iOS**: ${{ needs.ios-quality.result }}
+          
+          ## Quality Standards
+          
+          - Minimum Coverage: $MINIMUM_COVERAGE%
+          - Minimum Quality Score: 70/100
+          - Maximum Cyclomatic Complexity: $MAXIMUM_COMPLEXITY
+          - Zero Security Vulnerabilities Required
+          
+          ## Recommendations
+          
+          1. Maintain test coverage above $MINIMUM_COVERAGE%
+          2. Address all security vulnerabilities immediately
+          3. Keep code complexity low through refactoring
+          4. Follow established coding standards and linting rules
+          
+          Generated on: $(date -u)
+          EOF
+
+      - name: Upload quality report
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate-report
+          path: quality-report.md
+          retention-days: 90
+
+      - name: Comment PR with quality results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('quality-report.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `${report}`
+            });
+
+      - name: Update quality badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          QUALITY_SCORE=${{ needs.code-quality.outputs.quality-score }}
+          COLOR="red"
+          if [ "$QUALITY_SCORE" -ge 90 ]; then COLOR="brightgreen"; fi
+          if [ "$QUALITY_SCORE" -ge 70 ] && [ "$QUALITY_SCORE" -lt 90 ]; then COLOR="yellow"; fi
+          
+          curl -X POST "https://img.shields.io/badge/quality-${QUALITY_SCORE}%25-${COLOR}" > quality-badge.svg

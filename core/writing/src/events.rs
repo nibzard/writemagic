@@ -2,7 +2,8 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use writemagic_shared::{EntityId, Timestamp, DomainEvent, BaseEvent};
+use writemagic_shared::{EntityId, Timestamp, DomainEvent};
+use writemagic_shared::events::BaseEvent;
 use std::collections::HashMap;
 
 /// Document domain events

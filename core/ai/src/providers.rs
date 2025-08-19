@@ -4,6 +4,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use writemagic_shared::{Result, WritemagicError};
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::{RwLock, Semaphore};
+use dashmap::DashMap;
 
 /// AI provider trait following the pattern from CLAUDE.md
 #[async_trait]
@@ -190,6 +194,9 @@ pub struct ClaudeProvider {
     api_key: String,
     base_url: String,
     client: reqwest::Client,
+    rate_limiter: Arc<RateLimiter>,
+    cache: Arc<ResponseCache>,
+    usage_stats: Arc<RwLock<UsageStats>>,
 }
 
 impl ClaudeProvider {
@@ -197,12 +204,35 @@ impl ClaudeProvider {
         Self {
             api_key,
             base_url: "https://api.anthropic.com".to_string(),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(120))
+                .build()
+                .expect("Failed to create HTTP client"),
+            rate_limiter: Arc::new(RateLimiter::new(5, 200)), // 5 concurrent, 200ms min interval
+            cache: Arc::new(ResponseCache::new(300)), // 5 minute cache
+            usage_stats: Arc::new(RwLock::new(UsageStats {
+                total_requests: 0,
+                total_tokens: 0,
+                total_cost: 0.0,
+                requests_today: 0,
+                tokens_today: 0,
+                cost_today: 0.0,
+            })),
         }
     }
 
     pub fn with_base_url(mut self, base_url: String) -> Self {
         self.base_url = base_url;
+        self
+    }
+
+    pub fn with_rate_limit(mut self, max_concurrent: usize, min_interval_ms: u64) -> Self {
+        self.rate_limiter = Arc::new(RateLimiter::new(max_concurrent, min_interval_ms));
+        self
+    }
+
+    pub fn with_cache_ttl(mut self, ttl_seconds: u64) -> Self {
+        self.cache = Arc::new(ResponseCache::new(ttl_seconds));
         self
     }
 }
@@ -214,30 +244,70 @@ impl AIProvider for ClaudeProvider {
     }
 
     async fn complete(&self, request: &CompletionRequest) -> Result<CompletionResponse> {
+        // Check cache first
+        let cache_key = ResponseCache::generate_cache_key(request);
+        if let Some(cached_response) = self.cache.get(&cache_key) {
+            log::debug!("Cache hit for Claude request");
+            return Ok(cached_response);
+        }
+
+        // Rate limiting
+        let _permit = self.rate_limiter.acquire().await;
+
         let url = format!("{}/v1/messages", self.base_url);
         
         // Convert to Claude API format
         let claude_request = self.convert_to_claude_format(request)?;
+        
+        log::debug!("Making Claude API request to: {}", url);
+        let start_time = Instant::now();
         
         let response = self.client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .header("anthropic-version", "2023-06-01")
+            .header("x-api-key", &self.api_key)
             .json(&claude_request)
             .send()
             .await
-            .map_err(|e| WritemagicError::network(format!("Claude API request failed: {}", e)))?;
+            .map_err(|e| {
+                log::error!("Claude API network error: {}", e);
+                WritemagicError::network(format!("Claude API request failed: {}", e))
+            })?;
 
-        if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(WritemagicError::ai_provider(format!("Claude API error: {}", error_text)));
+        let status = response.status();
+        let response_text = response.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            log::error!("Claude API error (status {}): {}", status, response_text);
+            
+            // Handle specific error types
+            match status.as_u16() {
+                401 => return Err(WritemagicError::authentication("Invalid Claude API key")),
+                429 => return Err(WritemagicError::ai_provider("Claude API rate limit exceeded")),
+                500..=599 => return Err(WritemagicError::ai_provider("Claude API server error")),
+                _ => return Err(WritemagicError::ai_provider(format!("Claude API error: {}", response_text))),
+            }
         }
 
-        let claude_response: serde_json::Value = response.json().await
-            .map_err(|e| WritemagicError::ai_provider(format!("Failed to parse Claude response: {}", e)))?;
+        let claude_response: serde_json::Value = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                log::error!("Failed to parse Claude response: {}", e);
+                WritemagicError::ai_provider(format!("Failed to parse Claude response: {}", e))
+            })?;
 
-        self.convert_from_claude_format(&claude_response)
+        let completion_response = self.convert_from_claude_format(&claude_response)?;
+        
+        // Update usage stats
+        let request_duration = start_time.elapsed();
+        self.update_usage_stats(&completion_response, request_duration).await;
+
+        // Cache the response
+        self.cache.insert(cache_key, completion_response.clone(), None);
+
+        log::debug!("Claude request completed in {:?}", request_duration);
+        Ok(completion_response)
     }
 
     fn capabilities(&self) -> ModelCapabilities {
@@ -266,20 +336,29 @@ impl AIProvider for ClaudeProvider {
     }
 
     async fn get_usage_stats(&self) -> Result<UsageStats> {
-        // This would typically query the provider's usage API
-        // For now, return default stats
-        Ok(UsageStats {
-            total_requests: 0,
-            total_tokens: 0,
-            total_cost: 0.0,
-            requests_today: 0,
-            tokens_today: 0,
-            cost_today: 0.0,
-        })
+        let stats = self.usage_stats.read().await;
+        Ok(stats.clone())
     }
 }
 
 impl ClaudeProvider {
+    async fn update_usage_stats(&self, response: &CompletionResponse, _duration: Duration) {
+        let mut stats = self.usage_stats.write().await;
+        stats.total_requests += 1;
+        stats.total_tokens += response.usage.total_tokens as u64;
+        stats.requests_today += 1;
+        stats.tokens_today += response.usage.total_tokens as u64;
+        
+        // Calculate cost based on model capabilities
+        let capabilities = self.capabilities();
+        let input_cost = response.usage.prompt_tokens as f64 * capabilities.input_cost_per_token;
+        let output_cost = response.usage.completion_tokens as f64 * capabilities.output_cost_per_token;
+        let total_cost = input_cost + output_cost;
+        
+        stats.total_cost += total_cost;
+        stats.cost_today += total_cost;
+    }
+
     fn convert_to_claude_format(&self, request: &CompletionRequest) -> Result<serde_json::Value> {
         let mut claude_messages = Vec::new();
         let mut system_message = None;
@@ -365,6 +444,9 @@ pub struct OpenAIProvider {
     api_key: String,
     base_url: String,
     client: reqwest::Client,
+    rate_limiter: Arc<RateLimiter>,
+    cache: Arc<ResponseCache>,
+    usage_stats: Arc<RwLock<UsageStats>>,
 }
 
 impl OpenAIProvider {
@@ -372,12 +454,35 @@ impl OpenAIProvider {
         Self {
             api_key,
             base_url: "https://api.openai.com".to_string(),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(120))
+                .build()
+                .expect("Failed to create HTTP client"),
+            rate_limiter: Arc::new(RateLimiter::new(10, 100)), // 10 concurrent, 100ms min interval
+            cache: Arc::new(ResponseCache::new(300)), // 5 minute cache
+            usage_stats: Arc::new(RwLock::new(UsageStats {
+                total_requests: 0,
+                total_tokens: 0,
+                total_cost: 0.0,
+                requests_today: 0,
+                tokens_today: 0,
+                cost_today: 0.0,
+            })),
         }
     }
 
     pub fn with_base_url(mut self, base_url: String) -> Self {
         self.base_url = base_url;
+        self
+    }
+
+    pub fn with_rate_limit(mut self, max_concurrent: usize, min_interval_ms: u64) -> Self {
+        self.rate_limiter = Arc::new(RateLimiter::new(max_concurrent, min_interval_ms));
+        self
+    }
+
+    pub fn with_cache_ttl(mut self, ttl_seconds: u64) -> Self {
+        self.cache = Arc::new(ResponseCache::new(ttl_seconds));
         self
     }
 }
@@ -389,24 +494,65 @@ impl AIProvider for OpenAIProvider {
     }
 
     async fn complete(&self, request: &CompletionRequest) -> Result<CompletionResponse> {
+        // Check cache first
+        let cache_key = ResponseCache::generate_cache_key(request);
+        if let Some(cached_response) = self.cache.get(&cache_key) {
+            log::debug!("Cache hit for OpenAI request");
+            return Ok(cached_response);
+        }
+
+        // Rate limiting
+        let _permit = self.rate_limiter.acquire().await;
+
         let url = format!("{}/v1/chat/completions", self.base_url);
+        
+        log::debug!("Making OpenAI API request to: {}", url);
+        let start_time = Instant::now();
+
+        let openai_request = self.convert_to_openai_format(request);
         
         let response = self.client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
-            .json(request)
+            .json(&openai_request)
             .send()
             .await
-            .map_err(|e| WritemagicError::network(format!("OpenAI API request failed: {}", e)))?;
+            .map_err(|e| {
+                log::error!("OpenAI API network error: {}", e);
+                WritemagicError::network(format!("OpenAI API request failed: {}", e))
+            })?;
 
-        if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(WritemagicError::ai_provider(format!("OpenAI API error: {}", error_text)));
+        let status = response.status();
+        let response_text = response.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            log::error!("OpenAI API error (status {}): {}", status, response_text);
+            
+            // Handle specific error types
+            match status.as_u16() {
+                401 => return Err(WritemagicError::authentication("Invalid OpenAI API key")),
+                429 => return Err(WritemagicError::ai_provider("OpenAI API rate limit exceeded")),
+                500..=599 => return Err(WritemagicError::ai_provider("OpenAI API server error")),
+                _ => return Err(WritemagicError::ai_provider(format!("OpenAI API error: {}", response_text))),
+            }
         }
 
-        response.json().await
-            .map_err(|e| WritemagicError::ai_provider(format!("Failed to parse OpenAI response: {}", e)))
+        let completion_response: CompletionResponse = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                log::error!("Failed to parse OpenAI response: {}", e);
+                WritemagicError::ai_provider(format!("Failed to parse OpenAI response: {}", e))
+            })?;
+
+        // Update usage stats
+        let request_duration = start_time.elapsed();
+        self.update_usage_stats(&completion_response, request_duration).await;
+
+        // Cache the response
+        self.cache.insert(cache_key, completion_response.clone(), None);
+
+        log::debug!("OpenAI request completed in {:?}", request_duration);
+        Ok(completion_response)
     }
 
     fn capabilities(&self) -> ModelCapabilities {
@@ -434,14 +580,155 @@ impl AIProvider for OpenAIProvider {
     }
 
     async fn get_usage_stats(&self) -> Result<UsageStats> {
-        // This would typically query OpenAI's usage API
-        Ok(UsageStats {
-            total_requests: 0,
-            total_tokens: 0,
-            total_cost: 0.0,
-            requests_today: 0,
-            tokens_today: 0,
-            cost_today: 0.0,
+        let stats = self.usage_stats.read().await;
+        Ok(stats.clone())
+    }
+}
+
+impl OpenAIProvider {
+    async fn update_usage_stats(&self, response: &CompletionResponse, _duration: Duration) {
+        let mut stats = self.usage_stats.write().await;
+        stats.total_requests += 1;
+        stats.total_tokens += response.usage.total_tokens as u64;
+        stats.requests_today += 1;
+        stats.tokens_today += response.usage.total_tokens as u64;
+        
+        // Calculate cost based on model capabilities
+        let capabilities = self.capabilities();
+        let input_cost = response.usage.prompt_tokens as f64 * capabilities.input_cost_per_token;
+        let output_cost = response.usage.completion_tokens as f64 * capabilities.output_cost_per_token;
+        let total_cost = input_cost + output_cost;
+        
+        stats.total_cost += total_cost;
+        stats.cost_today += total_cost;
+    }
+
+    fn convert_to_openai_format(&self, request: &CompletionRequest) -> serde_json::Value {
+        serde_json::json!({
+            "model": request.model,
+            "messages": request.messages,
+            "max_tokens": request.max_tokens.unwrap_or(4096),
+            "temperature": request.temperature.unwrap_or(0.7),
+            "top_p": request.top_p.unwrap_or(1.0),
+            "frequency_penalty": request.frequency_penalty.unwrap_or(0.0),
+            "presence_penalty": request.presence_penalty.unwrap_or(0.0),
+            "stop": request.stop,
+            "stream": request.stream,
         })
+    }
+}
+
+/// Rate limiter for API requests
+#[derive(Debug)]
+pub struct RateLimiter {
+    semaphore: Semaphore,
+    last_request: RwLock<Instant>,
+    min_interval: Duration,
+}
+
+impl RateLimiter {
+    pub fn new(max_concurrent: usize, min_interval_ms: u64) -> Self {
+        Self {
+            semaphore: Semaphore::new(max_concurrent),
+            last_request: RwLock::new(Instant::now() - Duration::from_secs(60)),
+            min_interval: Duration::from_millis(min_interval_ms),
+        }
+    }
+
+    pub async fn acquire(&self) -> tokio::sync::SemaphorePermit<'_> {
+        let permit = self.semaphore.acquire().await.unwrap();
+        
+        // Enforce minimum interval between requests
+        let mut last = self.last_request.write().await;
+        let elapsed = last.elapsed();
+        if elapsed < self.min_interval {
+            let sleep_duration = self.min_interval - elapsed;
+            drop(last);
+            tokio::time::sleep(sleep_duration).await;
+        }
+        *self.last_request.write().await = Instant::now();
+        
+        permit
+    }
+}
+
+/// Response cache entry
+#[derive(Debug, Clone)]
+struct CacheEntry {
+    response: CompletionResponse,
+    created_at: Instant,
+    ttl: Duration,
+}
+
+impl CacheEntry {
+    fn is_expired(&self) -> bool {
+        self.created_at.elapsed() > self.ttl
+    }
+}
+
+/// Response cache for AI providers
+#[derive(Debug)]
+pub struct ResponseCache {
+    entries: DashMap<String, CacheEntry>,
+    default_ttl: Duration,
+}
+
+impl ResponseCache {
+    pub fn new(default_ttl_seconds: u64) -> Self {
+        Self {
+            entries: DashMap::new(),
+            default_ttl: Duration::from_secs(default_ttl_seconds),
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<CompletionResponse> {
+        if let Some(entry) = self.entries.get(key) {
+            if !entry.is_expired() {
+                return Some(entry.response.clone());
+            } else {
+                // Remove expired entry
+                drop(entry);
+                self.entries.remove(key);
+            }
+        }
+        None
+    }
+
+    pub fn insert(&self, key: String, response: CompletionResponse, ttl: Option<Duration>) {
+        let entry = CacheEntry {
+            response,
+            created_at: Instant::now(),
+            ttl: ttl.unwrap_or(self.default_ttl),
+        };
+        self.entries.insert(key, entry);
+    }
+
+    pub fn clear_expired(&self) {
+        self.entries.retain(|_, entry| !entry.is_expired());
+    }
+
+    pub fn generate_cache_key(request: &CompletionRequest) -> String {
+        // Create a deterministic cache key from request
+        let mut key_parts = Vec::new();
+        key_parts.push(request.model.clone());
+        key_parts.push(format!("{:?}", request.max_tokens));
+        key_parts.push(format!("{:?}", request.temperature));
+        
+        for message in &request.messages {
+            let role_str = match message.role {
+                MessageRole::System => "system",
+                MessageRole::User => "user", 
+                MessageRole::Assistant => "assistant",
+                MessageRole::Function => "function",
+            };
+            key_parts.push(format!("{}:{}", role_str, message.content));
+        }
+        
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        key_parts.join("|").hash(&mut hasher);
+        format!("{:x}", hasher.finish())
     }
 }

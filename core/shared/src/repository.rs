@@ -67,7 +67,7 @@ pub trait UnitOfWork: Send + Sync {
 #[async_trait]
 pub trait Specification<T>: Send + Sync {
     async fn is_satisfied_by(&self, entity: &T) -> bool;
-    fn to_sql(&self) -> (String, Vec<sqlx::types::Json<serde_json::Value>>);
+    fn to_sql(&self) -> (String, Vec<serde_json::Value>);
 }
 
 /// Read-only repository for queries

@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 # Workspace dependencies
 writemagic-shared = { path = "../shared" }
+writemagic-ai = { path = "../ai" }
 
 # Async
 async-trait.workspace = true
@@ -40,3 +41,10 @@ unicode-segmentation.workspace = true
 # Logging
 log.workspace = true
 tracing.workspace = true
+
+# Additional dependencies for enhanced core
+env_logger = "0.10"
+
+# Android logging (conditional)
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger.workspace = true

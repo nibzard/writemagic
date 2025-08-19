@@ -17,7 +17,7 @@ pub struct DocumentAggregate {
 
 impl DocumentAggregate {
     pub fn new(title: DocumentTitle, content: DocumentContent, content_type: ContentType, created_by: Option<EntityId>) -> Self {
-        let document = Document::new(title.value, content.value, content_type, created_by);
+        let document = Document::new(title.value.clone(), content.value.clone(), content_type.clone(), created_by);
         let event = DocumentEvent::DocumentCreated {
             document_id: document.id,
             title: title.value.clone(),

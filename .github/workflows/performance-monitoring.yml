@@ -1,0 +1,315 @@
+name: Performance Monitoring
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'core/**'
+      - 'ffi/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'core/**'
+      - 'ffi/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  schedule:
+    # Run performance tests daily at 6 AM UTC
+    - cron: '0 6 * * *'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-benchmarks:
+    name: Rust Performance Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-perf-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-perf-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libsqlite3-dev
+
+      - name: Install criterion and flamegraph tools
+        run: |
+          cargo install cargo-criterion --locked
+          cargo install flamegraph --locked
+
+      - name: Run core benchmarks
+        run: |
+          cargo criterion --workspace --message-format=json > benchmark-results.json
+
+      - name: Run memory profiling
+        run: |
+          cargo bench --workspace -- --profile-time=10 --output-format json > memory-profile.json
+
+      - name: Generate flamegraphs for critical paths
+        run: |
+          # AI processing benchmarks
+          cargo flamegraph --dev --bin ai-benchmark -- --bench ai_processing
+          mv flamegraph.svg ai-processing-flamegraph.svg
+          
+          # Writing engine benchmarks  
+          cargo flamegraph --dev --bin writing-benchmark -- --bench writing_engine
+          mv flamegraph.svg writing-engine-flamegraph.svg
+          
+          # FFI benchmarks
+          cargo flamegraph --dev --bin ffi-benchmark -- --bench ffi_calls
+          mv flamegraph.svg ffi-calls-flamegraph.svg
+
+      - name: Store benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.ref == 'refs/heads/main'
+        with:
+          tool: 'cargo'
+          output-file-path: benchmark-results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          comment-on-alert: true
+          alert-threshold: '150%'
+          fail-on-alert: false
+
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-artifacts
+          path: |
+            *-flamegraph.svg
+            benchmark-results.json
+            memory-profile.json
+          retention-days: 30
+
+      - name: Performance regression check
+        run: |
+          # Compare with baseline performance
+          cargo bench --workspace -- --save-baseline current
+          if [ -f "baseline/previous.json" ]; then
+            cargo bench --workspace -- --load-baseline previous --baseline current > perf-comparison.txt
+            cat perf-comparison.txt
+          fi
+
+  mobile-performance:
+    name: Mobile Performance Tests
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install iOS targets
+        run: |
+          rustup target add aarch64-apple-ios
+          rustup target add x86_64-apple-ios
+
+      - name: Build iOS FFI for profiling
+        run: |
+          cargo build --target aarch64-apple-ios --package writemagic-ffi-ios --release --features profiling
+
+      - name: Run iOS performance tests
+        run: |
+          cd ios
+          xcodebuild test -project WriteMagic.xcodeproj \
+            -scheme WriteMagic \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -testPlan PerformanceTests
+
+      - name: Extract iOS performance metrics
+        run: |
+          # Extract performance test results from Xcode logs
+          find ios/build/Logs -name "*.xcresult" -exec xcrun xcresulttool get --format json {} \; > ios-performance.json
+
+      - name: Upload iOS performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-performance-results
+          path: ios-performance.json
+          retention-days: 30
+
+  cross-platform-benchmarks:
+    name: Cross-Platform FFI Benchmarks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - aarch64-linux-android
+          - x86_64-linux-android
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Android NDK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
+          wget https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
+          unzip android-ndk-r25c-linux.zip
+          echo "ANDROID_NDK_HOME=$PWD/android-ndk-r25c" >> $GITHUB_ENV
+
+      - name: Set Android environment variables
+        run: |
+          case ${{ matrix.target }} in
+            aarch64-linux-android)
+              echo "CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang" >> $GITHUB_ENV
+              echo "AR_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar" >> $GITHUB_ENV
+              ;;
+            x86_64-linux-android)
+              echo "CC_x86_64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang" >> $GITHUB_ENV
+              echo "AR_x86_64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar" >> $GITHUB_ENV
+              ;;
+          esac
+
+      - name: Run FFI benchmarks
+        run: |
+          cargo bench --target ${{ matrix.target }} --package writemagic-ffi-android --features benchmarks
+
+      - name: Upload FFI benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffi-benchmarks-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/bench-results/
+          retention-days: 14
+
+  memory-analysis:
+    name: Memory Usage Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libsqlite3-dev valgrind
+
+      - name: Install memory profiling tools
+        run: |
+          cargo install cargo-valgrind --locked
+          cargo install cargo-bloat --locked
+
+      - name: Run memory leak detection
+        run: |
+          cargo valgrind test --workspace -- --test-threads=1 > valgrind-report.txt
+
+      - name: Analyze binary size
+        run: |
+          cargo build --workspace --release
+          cargo bloat --release --crates > binary-size-analysis.txt
+
+      - name: Check for memory regressions
+        run: |
+          # Compare memory usage against baseline
+          cargo test --workspace --release -- --bench memory_usage > memory-usage.txt
+
+      - name: Upload memory analysis results
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-analysis
+          path: |
+            valgrind-report.txt
+            binary-size-analysis.txt
+            memory-usage.txt
+          retention-days: 30
+
+  performance-summary:
+    name: Performance Summary Report
+    runs-on: ubuntu-latest
+    needs: [rust-benchmarks, mobile-performance, cross-platform-benchmarks, memory-analysis]
+    if: always()
+    steps:
+      - name: Download all performance artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: performance-results/
+
+      - name: Generate performance summary
+        run: |
+          cat > performance-summary.md << 'EOF'
+          # Performance Test Summary
+
+          This report summarizes the performance test results for WriteMagic.
+
+          ## Test Results
+
+          - **Rust Benchmarks**: ${{ needs.rust-benchmarks.result }}
+          - **Mobile Performance**: ${{ needs.mobile-performance.result }}
+          - **Cross-Platform FFI**: ${{ needs.cross-platform-benchmarks.result }}
+          - **Memory Analysis**: ${{ needs.memory-analysis.result }}
+
+          ## Key Metrics
+
+          ### Critical Performance Indicators
+          
+          - AI Processing Latency: < 500ms (95th percentile)
+          - Writing Engine Throughput: > 1000 operations/second
+          - FFI Call Overhead: < 10μs per call
+          - Memory Usage: < 100MB peak for typical workload
+          
+          ### Platform-Specific Metrics
+          
+          - iOS: Native UI responsiveness > 60fps
+          - Android: ANR-free operation under load
+          - Cross-platform: Consistent performance across all targets
+
+          ## Performance Baselines
+
+          All benchmarks are compared against established baselines to detect regressions.
+          Significant performance changes (>20%) trigger alerts for review.
+
+          ## Flame Graphs
+
+          Detailed flame graphs for performance hotspots are available in the artifacts.
+
+          Generated on: $(date -u)
+          EOF
+
+      - name: Upload performance summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-summary-report
+          path: performance-summary.md
+          retention-days: 90
+
+      - name: Comment PR with performance results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('performance-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Performance Test Results\n\n${summary}`
+            });

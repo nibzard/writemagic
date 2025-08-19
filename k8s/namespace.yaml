@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: writemagic-ENVIRONMENT
+  labels:
+    name: writemagic-ENVIRONMENT
+    app.kubernetes.io/name: writemagic
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: writemagic
+    environment: ENVIRONMENT
+  annotations:
+    deployment.writemagic.com/created-by: "github-actions"
+    deployment.writemagic.com/managed-by: "ci-cd-pipeline"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: writemagic-quota
+  namespace: writemagic-ENVIRONMENT
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    persistentvolumeclaims: "4"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: writemagic-limits
+  namespace: writemagic-ENVIRONMENT
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      cpu: "2"
+      memory: "4Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    type: Container

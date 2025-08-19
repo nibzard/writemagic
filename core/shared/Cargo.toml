@@ -27,6 +27,18 @@ chrono.workspace = true
 # Validation
 validator.workspace = true
 
+# Database
+sqlx.workspace = true
+
+# Text processing
+regex.workspace = true
+
+# Crypto
+sha2.workspace = true
+
 # Logging
 log.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"

@@ -19,6 +19,10 @@ impl EntityId {
         Self(uuid)
     }
 
+    pub fn from_string(s: &str) -> Result<Self, uuid::Error> {
+        Ok(Self(Uuid::parse_str(s)?))
+    }
+
     pub fn as_uuid(&self) -> Uuid {
         self.0
     }
@@ -61,6 +65,10 @@ impl Timestamp {
         Self(dt)
     }
 
+    pub fn from_string(s: &str) -> Result<Self, chrono::ParseError> {
+        Ok(Self(s.parse::<DateTime<Utc>>()?))
+    }
+
     pub fn as_datetime(&self) -> DateTime<Utc> {
         self.0
     }
@@ -91,6 +99,10 @@ impl ContentHash {
         Self(format!("{:x}", result))
     }
 
+    pub fn from_string(s: &str) -> Self {
+        Self(s.to_string())
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -119,8 +131,18 @@ impl FilePath {
         Ok(file_path)
     }
 
+    pub fn from_string(path: &str) -> crate::Result<Self> {
+        Self::new(path)
+    }
+
     pub fn as_str(&self) -> &str {
         &self.path
+    }
+}
+
+impl Default for FilePath {
+    fn default() -> Self {
+        Self { path: String::new() }
     }
 }
 
@@ -142,6 +164,21 @@ pub enum ContentType {
 }
 
 impl ContentType {
+    pub fn from_string(s: &str) -> Result<Self, String> {
+        match s {
+            "markdown" => Ok(Self::Markdown),
+            "plain_text" => Ok(Self::PlainText),
+            "html" => Ok(Self::Html),
+            "json" => Ok(Self::Json),
+            "yaml" => Ok(Self::Yaml),
+            s if s.starts_with("code:") => {
+                let language = s.strip_prefix("code:").unwrap_or("text");
+                Ok(Self::Code { language: language.to_string() })
+            }
+            _ => Err(format!("Unknown content type: {}", s)),
+        }
+    }
+
     pub fn from_extension(ext: &str) -> Self {
         match ext.to_lowercase().as_str() {
             "md" | "markdown" => Self::Markdown,

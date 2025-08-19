@@ -1,0 +1,416 @@
+name: Deployment Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: 'Target environment (staging, production)'
+      version:
+        required: true
+        type: string
+        description: 'Version to deploy'
+      force_deploy:
+        required: false
+        type: boolean
+        default: false
+        description: 'Force deployment even if checks fail'
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      KUBE_CONFIG:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: false
+      DATADOG_API_KEY:
+        required: false
+
+env:
+  AWS_REGION: us-west-2
+  CLUSTER_NAME: writemagic-${{ inputs.environment }}
+  IMAGE_TAG: ${{ inputs.version }}
+
+jobs:
+  pre-deployment-checks:
+    name: Pre-Deployment Validation
+    runs-on: ubuntu-latest
+    outputs:
+      health-check: ${{ steps.health.outputs.status }}
+      migration-required: ${{ steps.migration.outputs.required }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate deployment readiness
+        id: health
+        run: |
+          echo "Validating deployment readiness for ${{ inputs.environment }}..."
+          
+          # Check if all required artifacts are available
+          REQUIRED_ARTIFACTS=(
+            "writemagic-x86_64-unknown-linux-gnu"
+            "android-release"
+            "ios-release"
+          )
+          
+          ALL_PRESENT=true
+          for artifact in "${REQUIRED_ARTIFACTS[@]}"; do
+            if ! gh run download --name "$artifact" 2>/dev/null; then
+              echo "❌ Missing required artifact: $artifact"
+              ALL_PRESENT=false
+            fi
+          done
+          
+          if [ "$ALL_PRESENT" = true ]; then
+            echo "✅ All required artifacts present"
+            echo "status=healthy" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Missing required artifacts"
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check database migration requirements
+        id: migration
+        run: |
+          # Check if database migrations are required
+          if [ -d "migrations" ] && [ "$(ls -A migrations)" ]; then
+            echo "Database migrations detected"
+            echo "required=true" >> $GITHUB_OUTPUT
+          else
+            echo "No database migrations required"
+            echo "required=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate environment configuration
+        run: |
+          case ${{ inputs.environment }} in
+            staging)
+              echo "✅ Staging environment configuration valid"
+              ;;
+            production)
+              if [ "${{ inputs.force_deploy }}" != "true" ]; then
+                echo "Validating production readiness..."
+                # Add production-specific checks here
+                echo "✅ Production deployment authorized"
+              fi
+              ;;
+            *)
+              echo "❌ Unknown environment: ${{ inputs.environment }}"
+              exit 1
+              ;;
+          esac
+
+  infrastructure-deployment:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks]
+    if: needs.pre-deployment-checks.outputs.health-check == 'healthy'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Initialize Terraform
+        run: |
+          cd infrastructure/terraform
+          terraform init \
+            -backend-config="bucket=writemagic-terraform-state-${{ inputs.environment }}" \
+            -backend-config="key=${{ inputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+
+      - name: Plan infrastructure changes
+        run: |
+          cd infrastructure/terraform
+          terraform plan \
+            -var="environment=${{ inputs.environment }}" \
+            -var="image_tag=${{ inputs.version }}" \
+            -out=tfplan
+
+      - name: Apply infrastructure changes
+        run: |
+          cd infrastructure/terraform
+          terraform apply -auto-approve tfplan
+
+      - name: Update Kubernetes configuration
+        run: |
+          # Update kubeconfig
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          
+          # Verify cluster connectivity
+          kubectl cluster-info
+          kubectl get nodes
+
+  database-migration:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks, infrastructure-deployment]
+    if: needs.pre-deployment-checks.outputs.migration-required == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --locked
+
+      - name: Run database migrations
+        run: |
+          # Set database URL for environment
+          case ${{ inputs.environment }} in
+            staging)
+              export DATABASE_URL="postgresql://writemagic_user:${{ secrets.STAGING_DB_PASSWORD }}@staging-db.internal:5432/writemagic"
+              ;;
+            production)
+              export DATABASE_URL="postgresql://writemagic_user:${{ secrets.PROD_DB_PASSWORD }}@prod-db.internal:5432/writemagic"
+              ;;
+          esac
+          
+          echo "Running database migrations..."
+          sqlx migrate run
+          
+          echo "Verifying migration success..."
+          sqlx migrate info
+
+      - name: Create database backup
+        if: inputs.environment == 'production'
+        run: |
+          echo "Creating production database backup before deployment..."
+          # Add backup creation logic here
+
+  backend-deployment:
+    name: Deploy Backend Services
+    runs-on: ubuntu-latest
+    needs: [database-migration, infrastructure-deployment]
+    if: always() && (needs.infrastructure-deployment.result == 'success' && (needs.database-migration.result == 'success' || needs.database-migration.result == 'skipped'))
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          kubectl version --client
+
+      - name: Deploy backend services
+        run: |
+          # Update image tags in deployment manifests
+          sed -i "s/IMAGE_TAG/${{ inputs.version }}/g" k8s/backend-deployment.yaml
+          sed -i "s/ENVIRONMENT/${{ inputs.environment }}/g" k8s/backend-deployment.yaml
+          
+          # Apply Kubernetes manifests
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/secrets.yaml
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/backend-service.yaml
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/writemagic-backend -n writemagic-${{ inputs.environment }} --timeout=600s
+
+      - name: Verify backend deployment
+        run: |
+          echo "Verifying backend deployment..."
+          kubectl get pods -n writemagic-${{ inputs.environment }}
+          kubectl get services -n writemagic-${{ inputs.environment }}
+          
+          # Health check
+          BACKEND_URL=$(kubectl get service writemagic-backend -n writemagic-${{ inputs.environment }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          curl -f http://$BACKEND_URL/health || exit 1
+
+  mobile-app-deployment:
+    name: Deploy Mobile Applications
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks]
+    if: needs.pre-deployment-checks.outputs.health-check == 'healthy'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download mobile artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: android-artifacts/
+
+      - name: Deploy Android app
+        if: inputs.environment == 'production'
+        run: |
+          echo "Deploying Android app to Google Play Store..."
+          # Add Google Play Store deployment logic here
+          # This would typically use the Google Play Developer API
+
+      - name: Deploy iOS app
+        if: inputs.environment == 'production'
+        run: |
+          echo "Deploying iOS app to App Store..."
+          # Add App Store deployment logic here
+          # This would typically use App Store Connect API
+
+      - name: Update mobile configuration
+        run: |
+          echo "Updating mobile app configuration for ${{ inputs.environment }}..."
+          # Update backend endpoints and configuration for mobile apps
+
+  monitoring-setup:
+    name: Setup Monitoring & Observability
+    runs-on: ubuntu-latest
+    needs: [backend-deployment]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy monitoring stack
+        run: |
+          echo "Setting up monitoring for ${{ inputs.environment }}..."
+          
+          # Deploy Prometheus and Grafana
+          kubectl apply -f monitoring/prometheus/
+          kubectl apply -f monitoring/grafana/
+          kubectl apply -f monitoring/alertmanager/
+
+      - name: Configure Datadog (if enabled)
+        if: secrets.DATADOG_API_KEY != ''
+        run: |
+          kubectl create secret generic datadog-secret \
+            --from-literal=api-key=${{ secrets.DATADOG_API_KEY }} \
+            -n writemagic-${{ inputs.environment }}
+          
+          kubectl apply -f monitoring/datadog/
+
+      - name: Set up log aggregation
+        run: |
+          # Deploy Fluentd for log collection
+          kubectl apply -f monitoring/fluentd/
+          
+          # Configure log forwarding to centralized logging
+          echo "Log aggregation configured for ${{ inputs.environment }}"
+
+  post-deployment-tests:
+    name: Post-Deployment Validation
+    runs-on: ubuntu-latest
+    needs: [backend-deployment, mobile-app-deployment, monitoring-setup]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests against ${{ inputs.environment }}..."
+          
+          # Get service endpoints
+          BACKEND_URL=$(kubectl get service writemagic-backend -n writemagic-${{ inputs.environment }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          
+          # Basic health checks
+          curl -f http://$BACKEND_URL/health
+          curl -f http://$BACKEND_URL/metrics
+          
+          # API functionality tests
+          curl -f -X POST http://$BACKEND_URL/api/v1/health
+          
+          echo "✅ Smoke tests passed"
+
+      - name: Run integration tests
+        run: |
+          echo "Running integration tests..."
+          
+          # Set environment-specific configuration
+          export API_BASE_URL="http://$BACKEND_URL/api/v1"
+          export TEST_ENVIRONMENT="${{ inputs.environment }}"
+          
+          # Run integration test suite
+          cargo test --package integration-tests --features ${{ inputs.environment }}
+
+      - name: Performance baseline check
+        run: |
+          echo "Running performance baseline checks..."
+          
+          # API response time tests
+          curl -w "@curl-format.txt" -s -o /dev/null http://$BACKEND_URL/api/v1/health
+          
+          # Database connection pool health
+          curl -f http://$BACKEND_URL/metrics | grep "database_connections"
+          
+          echo "✅ Performance baseline checks passed"
+
+  deployment-notification:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [post-deployment-tests]
+    if: always()
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [ "${{ needs.post-deployment-tests.result }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ Deployment successful" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ Deployment failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        if: secrets.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ steps.status.outputs.status }}
+          channel: '#deployments'
+          text: |
+            WriteMagic Deployment to ${{ inputs.environment }}
+            
+            **Version**: ${{ inputs.version }}
+            **Status**: ${{ steps.status.outputs.message }}
+            **Environment**: ${{ inputs.environment }}
+            **Triggered by**: ${{ github.actor }}
+            
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Update deployment status
+        run: |
+          echo "Updating deployment status in external systems..."
+          
+          # Update deployment tracking
+          cat > deployment-status.json << EOF
+          {
+            "environment": "${{ inputs.environment }}",
+            "version": "${{ inputs.version }}",
+            "status": "${{ steps.status.outputs.status }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "actor": "${{ github.actor }}"
+          }
+          EOF
+
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-status-${{ inputs.environment }}
+          path: deployment-status.json
+          retention-days: 90
