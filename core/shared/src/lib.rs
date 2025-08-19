@@ -10,6 +10,11 @@ pub mod traits;
 pub mod validation;
 pub mod buffer_pool;
 pub mod shutdown;
+pub mod service_container;
+pub mod ffi_safety;
+
+#[cfg(test)]
+pub mod property_testing;
 
 // Re-export commonly used types
 pub use database::{DatabaseManager, DatabaseConfig, MigrationStatus};
@@ -21,3 +26,5 @@ pub use types::*;
 pub use traits::*;
 pub use buffer_pool::{BufferPool, PooledBuffer, WorkingMemory, with_working_memory};
 pub use shutdown::{ShutdownCoordinator, ShutdownSubscriber, GracefulShutdown};
+pub use service_container::{ServiceContainer, ServiceRef, ProviderRegistry, StaticServiceRegistry};
+pub use ffi_safety::{FFIResult, FFIError, SafeCString, SafeStringReader, FFIHandle};

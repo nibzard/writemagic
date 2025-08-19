@@ -7,7 +7,7 @@ pub mod services;
 pub mod repositories;
 pub mod examples;
 pub mod writing_service;
-pub mod writing_service_examples;
+pub mod retry_patterns;
 
 #[cfg(test)]
 mod test_basic;
@@ -21,3 +21,4 @@ pub use value_objects::*;
 pub use services::*;
 pub use repositories::*;
 pub use writing_service::*;
+pub use retry_patterns::{RetryConfig, CircuitBreakerConfig, with_retry, with_timeout};

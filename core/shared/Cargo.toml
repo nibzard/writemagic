@@ -48,3 +48,5 @@ bytes.workspace = true
 
 [dev-dependencies]
 tokio-test = "0.4"
+criterion.workspace = true
+proptest.workspace = true

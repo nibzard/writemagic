@@ -9,6 +9,7 @@ members = [
     "core/agent",
     "ffi/android",
     "ffi/ios",
+    "web",
 ]
 
 [workspace.package]
@@ -43,6 +44,14 @@ git2 = "0.18"
 # HTTP client for AI providers  
 reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
 
+# Web Framework (Axum ecosystem)
+axum = { version = "0.7", features = ["macros", "ws", "multipart"] }
+axum-extra = { version = "0.9", features = ["typed-header", "cookie", "form"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["fs", "cors", "compression-full", "trace", "timeout", "limit", "request-id", "sensitive-headers"] }
+hyper = { version = "1.1", features = ["full"] }
+hyper-util = "0.1"
+
 # UUID and time
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -68,6 +77,10 @@ pin-project = "1.1"
 crossbeam = "0.8"
 rayon = "1.10"
 
+# Benchmarking and testing
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.5"
+
 # Cross-platform FFI
 cxx = "1.0"
 
@@ -77,6 +90,7 @@ android_logger = "0.13"
 
 # Validation
 validator = { version = "0.16", features = ["derive"] }
+garde = { version = "0.20", features = ["derive", "email", "url"] }
 
 # Configuration
 config = "0.13"
@@ -92,6 +106,9 @@ futures = "0.3"
 # Crypto
 aes-gcm = "0.10"
 sha2 = "0.10"
+argon2 = "0.5"
+jsonwebtoken = "9.3"
+ring = "0.17"
 
 # iOS specific
 libc = "0.2"
@@ -136,6 +153,10 @@ lto = "fat"             # Link-time optimization
 codegen-units = 1       # Single codegen unit
 panic = "abort"         # No unwinding
 strip = true            # Strip symbols
+
+[[bench]]
+name = "criterion_benchmarks"
+harness = false
 
 # Cross-compilation targets
 [workspace.metadata.cross]
