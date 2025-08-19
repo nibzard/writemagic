@@ -42,6 +42,7 @@ const STATIC_CACHE_URLS = [
   '/styles/themes.css',
   '/styles/responsive.css',
   '/styles/accessibility.css',
+  '/styles/performance.css',
   '/scripts/app.js',
   '/icons/favicon.svg',
   '/icons/icon-16x16.png',
@@ -67,8 +68,15 @@ const WASM_CACHE_URLS = [
   '/src/js/utils/event-emitter.js',
   '/src/js/utils/debounce.js',
   '/src/js/ai-proxy-integration.js',
+  '/src/js/utils/wasm-loader.js',
+  '/src/js/utils/progressive-loader.js', 
+  '/src/js/utils/performance-monitor.js',
+  '/src/js/performance-dashboard.js',
   '/core/wasm/pkg/writemagic_wasm.js',
-  '/core/wasm/pkg/writemagic_wasm_bg.wasm'
+  '/core/wasm/pkg/writemagic_wasm_bg.wasm',
+  '/core/wasm/pkg/streaming_loader.js',
+  '/core/wasm/pkg/module_manifest.json',
+  '/core/wasm/pkg/integrity.json'
 ];
 
 // Cache configuration with strategies and expiration
@@ -858,6 +866,14 @@ self.addEventListener('message', event => {
       
     case 'PRELOAD_RESOURCES':
       event.waitUntil(handlePreloadRequest(data.urls, event));
+      break;
+      
+    case 'OPTIMIZE_CACHE_STRATEGY':
+      event.waitUntil(handleCacheOptimization(event));
+      break;
+      
+    case 'GET_PERFORMANCE_METRICS':
+      event.waitUntil(handlePerformanceMetricsRequest(event));
       break;
       
     default:
@@ -1688,6 +1704,261 @@ async function broadcastToClients(message) {
     }
   } catch (error) {
     console.warn('[SW] Failed to broadcast to clients:', error);
+  }
+}
+
+// ==================== PERFORMANCE OPTIMIZATION HANDLERS ====================
+
+// Handle cache optimization request
+async function handleCacheOptimization(event) {
+  try {
+    console.log('[SW] Optimizing cache strategies...');
+    
+    // Implement aggressive cache cleanup
+    await performStorageCleanup();
+    
+    // Optimize cache strategies for WASM resources
+    await optimizeWasmCaching();
+    
+    // Preload critical resources based on usage patterns
+    await preloadCriticalResources();
+    
+    event.ports[0]?.postMessage({ 
+      success: true, 
+      message: 'Cache optimization completed',
+      timestamp: Date.now()
+    });
+    
+  } catch (error) {
+    console.error('[SW] Cache optimization failed:', error);
+    event.ports[0]?.postMessage({ 
+      error: error.message,
+      timestamp: Date.now()
+    });
+  }
+}
+
+// Handle performance metrics request
+async function handlePerformanceMetricsRequest(event) {
+  try {
+    const metrics = {
+      cacheStats: await getCacheStatistics(),
+      networkStats: getNetworkStatistics(),
+      storageStats: await getStorageStatistics(),
+      wasmStats: await getWasmStatistics(),
+      timestamp: Date.now()
+    };
+    
+    event.ports[0]?.postMessage({
+      success: true,
+      metrics,
+      timestamp: Date.now()
+    });
+    
+  } catch (error) {
+    console.error('[SW] Performance metrics collection failed:', error);
+    event.ports[0]?.postMessage({ 
+      error: error.message,
+      timestamp: Date.now()
+    });
+  }
+}
+
+// Optimize WASM caching strategies
+async function optimizeWasmCaching() {
+  try {
+    const wasmCache = await caches.open(CACHE_NAMES.WASM);
+    const wasmRequests = await wasmCache.keys();
+    
+    // Check and validate all WASM resources
+    let optimizedCount = 0;
+    
+    for (const request of wasmRequests) {
+      const response = await wasmCache.match(request);
+      
+      if (response) {
+        // Check if WASM resource needs revalidation
+        const shouldRevalidate = await shouldRevalidateWasmResource(response, request);
+        
+        if (shouldRevalidate) {
+          try {
+            const freshResponse = await fetch(request);
+            if (freshResponse.ok) {
+              await wasmCache.put(request, freshResponse.clone());
+              optimizedCount++;
+            }
+          } catch (error) {
+            console.debug('[SW] Failed to revalidate WASM resource:', request.url);
+          }
+        }
+      }
+    }
+    
+    console.log(`[SW] Optimized ${optimizedCount} WASM resources`);
+    
+  } catch (error) {
+    console.error('[SW] WASM cache optimization failed:', error);
+  }
+}
+
+// Check if WASM resource should be revalidated
+async function shouldRevalidateWasmResource(response, request) {
+  // Check age of cached resource
+  const dateHeader = response.headers.get('date');
+  if (dateHeader) {
+    const cacheDate = new Date(dateHeader);
+    const age = Date.now() - cacheDate.getTime();
+    
+    // Revalidate WASM resources older than 1 hour
+    if (age > 60 * 60 * 1000) {
+      return true;
+    }
+  }
+  
+  // Check if integrity validation fails
+  if (request.url.includes('.wasm')) {
+    try {
+      const isValid = await validateWasmIntegrity(response.clone());
+      return !isValid;
+    } catch (error) {
+      return true; // Revalidate on integrity check failure
+    }
+  }
+  
+  return false;
+}
+
+// Preload critical resources based on usage patterns
+async function preloadCriticalResources() {
+  const criticalResources = [
+    '/styles/critical.css',
+    '/scripts/core.js',
+    '/src/js/utils/wasm-loader.js',
+    '/src/js/utils/progressive-loader.js'
+  ];
+  
+  const cache = await caches.open(CACHE_NAMES.DYNAMIC);
+  let preloadedCount = 0;
+  
+  for (const resourceUrl of criticalResources) {
+    try {
+      // Check if already cached
+      const cached = await cache.match(resourceUrl);
+      if (!cached) {
+        const response = await fetch(resourceUrl);
+        if (response.ok) {
+          await cache.put(resourceUrl, response);
+          preloadedCount++;
+        }
+      }
+    } catch (error) {
+      console.debug(`[SW] Failed to preload ${resourceUrl}:`, error);
+    }
+  }
+  
+  console.log(`[SW] Preloaded ${preloadedCount} critical resources`);
+}
+
+// Get cache statistics
+async function getCacheStatistics() {
+  const stats = {};
+  
+  try {
+    for (const [name, cacheName] of Object.entries(CACHE_NAMES)) {
+      const cache = await caches.open(cacheName);
+      const requests = await cache.keys();
+      
+      let totalSize = 0;
+      let resourceCount = 0;
+      
+      for (const request of requests) {
+        const response = await cache.match(request);
+        if (response) {
+          const size = parseInt(response.headers.get('content-length') || '0');
+          totalSize += size;
+          resourceCount++;
+        }
+      }
+      
+      stats[name.toLowerCase()] = {
+        resourceCount,
+        totalSize,
+        cacheName
+      };
+    }
+  } catch (error) {
+    console.error('[SW] Cache statistics collection failed:', error);
+  }
+  
+  return stats;
+}
+
+// Get network statistics
+function getNetworkStatistics() {
+  return {
+    isOnline,
+    networkQuality,
+    effectiveType: navigator.connection?.effectiveType || 'unknown',
+    downlink: navigator.connection?.downlink || 0,
+    rtt: navigator.connection?.rtt || 0
+  };
+}
+
+// Get storage statistics
+async function getStorageStatistics() {
+  try {
+    const estimate = await navigator.storage?.estimate?.();
+    
+    return {
+      quota: estimate?.quota || 0,
+      usage: estimate?.usage || 0,
+      usagePercent: estimate ? (estimate.usage / estimate.quota) * 100 : 0,
+      available: estimate ? estimate.quota - estimate.usage : 0
+    };
+  } catch (error) {
+    console.error('[SW] Storage statistics collection failed:', error);
+    return {};
+  }
+}
+
+// Get WASM-specific statistics
+async function getWasmStatistics() {
+  try {
+    const wasmCache = await caches.open(CACHE_NAMES.WASM);
+    const requests = await wasmCache.keys();
+    
+    let wasmFileCount = 0;
+    let jsFileCount = 0;
+    let totalWasmSize = 0;
+    let totalJsSize = 0;
+    
+    for (const request of requests) {
+      const response = await wasmCache.match(request);
+      if (response) {
+        const size = parseInt(response.headers.get('content-length') || '0');
+        
+        if (request.url.endsWith('.wasm')) {
+          wasmFileCount++;
+          totalWasmSize += size;
+        } else if (request.url.endsWith('.js')) {
+          jsFileCount++;
+          totalJsSize += size;
+        }
+      }
+    }
+    
+    return {
+      wasmFiles: wasmFileCount,
+      jsFiles: jsFileCount,
+      totalWasmSize,
+      totalJsSize,
+      totalSize: totalWasmSize + totalJsSize,
+      compressionRatio: totalWasmSize > 0 ? (totalWasmSize / (totalWasmSize + totalJsSize)) : 0
+    };
+    
+  } catch (error) {
+    console.error('[SW] WASM statistics collection failed:', error);
+    return {};
   }
 }
 

@@ -328,10 +328,42 @@ if [ -d "$OUTPUT_DIR" ] && [ -f "$OUTPUT_DIR/writemagic_wasm.js" ]; then
     print_info "Generated files:"
     ls -la "$OUTPUT_DIR"
     
-    # Show package size
+    # Show package size and optimization results
     if [ -f "$OUTPUT_DIR/writemagic_wasm_bg.wasm" ]; then
         WASM_SIZE=$(du -h "$OUTPUT_DIR/writemagic_wasm_bg.wasm" | cut -f1)
-        print_info "WASM module size: $WASM_SIZE"
+        WASM_SIZE_BYTES=$(stat -c%s "$OUTPUT_DIR/writemagic_wasm_bg.wasm" 2>/dev/null || stat -f%z "$OUTPUT_DIR/writemagic_wasm_bg.wasm" 2>/dev/null)
+        
+        print_info "WASM module size: $WASM_SIZE ($WASM_SIZE_BYTES bytes)"
+        
+        # Check against target size (2MB)
+        TARGET_SIZE=$((2 * 1024 * 1024))
+        if [ "$WASM_SIZE_BYTES" -gt "$TARGET_SIZE" ]; then
+            print_warning "WASM bundle exceeds 2MB target size"
+            PERCENT_OVER=$(( (WASM_SIZE_BYTES - TARGET_SIZE) * 100 / TARGET_SIZE ))
+            print_warning "Bundle is ${PERCENT_OVER}% over target"
+        else
+            print_success "WASM bundle size is within target (<2MB)"
+        fi
+        
+        # Show compression ratio if wasm-opt was used
+        if [ -f "$OUTPUT_DIR/writemagic_wasm_bg.wasm.backup" ]; then
+            OLD_SIZE=$(stat -c%s "$OUTPUT_DIR/writemagic_wasm_bg.wasm.backup" 2>/dev/null || stat -f%z "$OUTPUT_DIR/writemagic_wasm_bg.wasm.backup" 2>/dev/null)
+            REDUCTION=$(( (OLD_SIZE - WASM_SIZE_BYTES) * 100 / OLD_SIZE ))
+            print_success "Size reduced by ${REDUCTION}% through optimization"
+        fi
+    fi
+    
+    # Show optimization artifacts
+    if [ -f "$OUTPUT_DIR/module_manifest.json" ]; then
+        print_info "Module manifest generated for progressive loading"
+    fi
+    
+    if [ -f "$OUTPUT_DIR/streaming_loader.js" ]; then
+        print_info "Streaming loader helper generated"
+    fi
+    
+    if [ -f "$OUTPUT_DIR/integrity.json" ]; then
+        print_info "Integrity checksums generated for security"
     fi
     
     # Return to project root

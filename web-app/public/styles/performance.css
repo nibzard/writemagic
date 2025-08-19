@@ -1,0 +1,616 @@
+/**
+ * Performance Optimization Styles for WriteMagic
+ * 
+ * Includes styles for PWA installation prompts, loading indicators,
+ * and performance monitoring components.
+ */
+
+/* PWA Install Prompt Styles */
+.install-prompt {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  max-width: 320px;
+  z-index: 10000;
+  animation: slideInFromRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.install-prompt h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.install-prompt p {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.install-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.install-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.install-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dismiss-btn {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dismiss-btn:hover {
+  color: white;
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Enhanced Loading Indicators */
+.loading-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  color: white;
+}
+
+.loading-container.fade-out {
+  animation: fadeOut 0.5s ease-in-out forwards;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.loading-spinner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top: 3px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-progress {
+  width: 300px;
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  height: 8px;
+  position: relative;
+}
+
+.loading-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ffffff 0%, #f1f5f9 100%);
+  border-radius: 10px;
+  transition: transform 0.3s ease;
+  transform: scaleX(0);
+  transform-origin: left;
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+.loading-status {
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  min-height: 1.5rem;
+  opacity: 0.9;
+}
+
+.loading-details {
+  font-size: 0.875rem;
+  text-align: center;
+  opacity: 0.7;
+  margin-top: 1rem;
+  max-width: 400px;
+  line-height: 1.4;
+}
+
+/* PWA Specific Styles */
+.pwa-installed .header-nav {
+  padding-top: env(safe-area-inset-top);
+}
+
+.pwa-standalone {
+  /* Optimize for standalone PWA mode */
+  --header-height: calc(3rem + env(safe-area-inset-top));
+}
+
+.pwa-standalone .app-header {
+  padding-top: env(safe-area-inset-top);
+  background: var(--color-primary);
+  color: white;
+}
+
+.pwa-standalone .main-content {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Performance Monitoring Styles */
+.performance-indicator {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-family: 'SF Mono', Monaco, monospace;
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  display: none;
+  min-width: 120px;
+}
+
+.performance-indicator.visible {
+  display: block;
+  animation: slideInFromTop 0.3s ease-out;
+}
+
+.performance-stats {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.stat-label {
+  font-size: 0.625rem;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.stat-value.good {
+  color: #10b981;
+}
+
+.stat-value.warning {
+  color: #f59e0b;
+}
+
+.stat-value.critical {
+  color: #ef4444;
+}
+
+/* Network Quality Indicator */
+.network-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.network-status {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.network-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.network-dot.slow {
+  background: #ef4444;
+  animation: pulse 1s infinite;
+}
+
+.network-dot.moderate {
+  background: #f59e0b;
+}
+
+.network-dot.offline {
+  background: #6b7280;
+}
+
+/* Optimization Suggestions */
+.optimization-suggestion {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(59, 130, 246, 0.95);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 300px;
+  z-index: 1000;
+  animation: slideInFromLeft 0.4s ease-out;
+  backdrop-filter: blur(10px);
+}
+
+.suggestion-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.suggestion-description {
+  font-size: 0.875rem;
+  opacity: 0.9;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.suggestion-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.suggestion-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.suggestion-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.suggestion-btn.dismiss {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Memory Usage Visualization */
+.memory-usage-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.memory-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #f59e0b 70%, #ef4444 100%);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* WASM Loading States */
+.wasm-loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.wasm-loading-indicator.compiling {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.wasm-loading-indicator.ready {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.wasm-loading-indicator.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.wasm-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Performance Dashboard Toggle */
+.performance-dashboard-toggle {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+}
+
+.performance-dashboard-toggle:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.performance-dashboard-toggle.active {
+  background: #3b82f6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .install-prompt {
+    left: 10px;
+    right: 10px;
+    max-width: none;
+    bottom: 10px;
+  }
+  
+  .loading-progress {
+    width: 280px;
+  }
+  
+  .loading-details {
+    max-width: 300px;
+    padding: 0 1rem;
+  }
+  
+  .performance-indicator {
+    left: 10px;
+    top: 10px;
+    font-size: 0.625rem;
+    padding: 0.375rem 0.75rem;
+  }
+  
+  .network-indicator {
+    right: 10px;
+    top: 10px;
+    font-size: 0.625rem;
+    padding: 0.375rem 0.75rem;
+  }
+  
+  .optimization-suggestion {
+    left: 10px;
+    right: 10px;
+    max-width: none;
+  }
+  
+  .performance-dashboard-toggle {
+    bottom: 10px;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.625rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .install-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .install-btn,
+  .dismiss-btn {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .performance-stats {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+  .install-prompt {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  .optimization-suggestion {
+    background: rgba(30, 41, 59, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .install-prompt,
+  .optimization-suggestion,
+  .performance-indicator.visible {
+    animation: none;
+  }
+  
+  .loading-bar::after {
+    animation: none;
+  }
+  
+  .loading-spinner::before {
+    animation: none;
+  }
+  
+  .wasm-spinner {
+    animation: none;
+  }
+  
+  .network-dot.slow {
+    animation: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .install-prompt {
+    background: #000;
+    border: 2px solid #fff;
+  }
+  
+  .loading-container {
+    background: #000;
+    color: #fff;
+  }
+  
+  .performance-indicator,
+  .network-indicator,
+  .optimization-suggestion {
+    background: #000;
+    border: 1px solid #fff;
+  }
+}
+
+/* Animations */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromTop {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    left: 100%;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
