@@ -71,7 +71,7 @@ services:
     environment:
       POSTGRES_DB: writemagic
       POSTGRES_USER: writemagic
-      POSTGRES_PASSWORD: writemagic_dev_password
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -82,6 +82,8 @@ services:
     profiles:
       - production
       - database
+    secrets:
+      - postgres_password
 
   # Redis for caching and session management
   redis:
@@ -124,8 +126,11 @@ services:
     image: grafana/grafana:latest
     container_name: writemagic-grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_SECRET_KEY__FILE=/run/secrets/grafana_secret_key
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=true
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
@@ -138,6 +143,9 @@ services:
       - monitoring
     depends_on:
       - prometheus
+    secrets:
+      - grafana_admin_password
+      - grafana_secret_key
 
   # Jaeger for distributed tracing
   jaeger:
@@ -180,7 +188,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=writemagic
-      - MINIO_ROOT_PASSWORD=writemagic123
+      - MINIO_ROOT_PASSWORD_FILE=/run/secrets/minio_password
     volumes:
       - minio-data:/data
     ports:
@@ -190,6 +198,8 @@ services:
       - writemagic-network
     profiles:
       - storage
+    secrets:
+      - minio_password
 
   # Nginx for reverse proxy and load balancing
   nginx:
@@ -232,3 +242,17 @@ networks:
     ipam:
       config:
         - subnet: 172.20.0.0/16
+
+secrets:
+  postgres_password:
+    external: true
+    name: writemagic_postgres_password
+  minio_password:
+    external: true
+    name: writemagic_minio_password
+  grafana_admin_password:
+    external: true
+    name: writemagic_grafana_admin_password
+  grafana_secret_key:
+    external: true
+    name: writemagic_grafana_secret_key

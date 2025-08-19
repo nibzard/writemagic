@@ -54,36 +54,21 @@ COPY --from=rust-builder /app/target/release/ android/app/src/main/jniLibs/
 # Build Android APK
 RUN cd android && chmod +x gradlew && ./gradlew assembleRelease
 
-# Runtime stage
-FROM ubuntu:22.04 as runtime
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libssl3 \
-    libsqlite3-0 \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create app user
-RUN groupadd -r writemagic && useradd -r -g writemagic writemagic
+# Runtime stage - using distroless for security
+FROM gcr.io/distroless/cc-debian12:nonroot as runtime
 
 # Set working directory
 WORKDIR /app
 
-# Copy binaries from builder stages
-COPY --from=rust-builder /app/target/release/ /app/bin/
-COPY --from=android-builder /app/android/app/build/outputs/apk/release/ /app/releases/android/
+# Copy binaries from builder stages with proper ownership
+COPY --from=rust-builder --chown=nonroot:nonroot /app/target/release/ /app/bin/
+COPY --from=android-builder --chown=nonroot:nonroot /app/android/app/build/outputs/apk/release/ /app/releases/android/
 
-# Set ownership
-RUN chown -R writemagic:writemagic /app
+# Already using nonroot user from distroless image
 
-# Switch to app user
-USER writemagic
-
-# Health check
+# Health check - using internal health endpoint (no curl in distroless)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD ["/app/bin/writemagic-server", "--health-check"]
 
 # Expose ports
 EXPOSE 8080 3000
