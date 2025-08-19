@@ -33,7 +33,7 @@ git-fetch-with-cli = true    # Use system git for better SSH key support
 [alias]
 # Useful shortcuts
 t = "nextest run"
-bench = "run --release --bin bench"
+benchmark = "run --release --bin benchmark"
 asm = "asm --intel"
 bloat = "bloat --release --crates"
 machete = "machete"

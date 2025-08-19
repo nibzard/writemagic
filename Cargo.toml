@@ -181,9 +181,6 @@ codegen-units = 1       # Single codegen unit
 panic = "abort"         # No unwinding
 strip = true            # Strip symbols
 
-[[bench]]
-name = "criterion_benchmarks"
-harness = false
 
 # Cross-compilation targets
 [workspace.metadata.cross]
