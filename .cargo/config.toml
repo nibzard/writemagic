@@ -1,0 +1,41 @@
+# .cargo/config.toml
+[build]
+# Use mold linker for much faster linking (100x faster than ld)
+# Install with: sudo apt install mold (Ubuntu) or brew install mold (macOS)
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = [
+    "-C", "link-arg=-fuse-ld=mold",
+    "-C", "target-cpu=native",     # Optimize for current CPU
+    "-Z", "share-generics=y",      # Share monomorphized generics (requires nightly)
+]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]  # Static CRT linking
+
+[target.aarch64-linux-android]
+linker = "aarch64-linux-android-clang"
+
+[target.armv7-linux-androideabi]
+linker = "armv7a-linux-androideabi-clang"
+
+[target.i686-linux-android]
+linker = "i686-linux-android-clang"
+
+[target.x86_64-linux-android]
+linker = "x86_64-linux-android-clang"
+
+[net]
+git-fetch-with-cli = true    # Use system git for better SSH key support
+
+[alias]
+# Useful shortcuts
+t = "nextest run"
+bench = "run --release --bin bench"
+asm = "asm --intel"
+bloat = "bloat --release --crates"
+machete = "machete"
+outdated = "outdated"
+audit = "audit"

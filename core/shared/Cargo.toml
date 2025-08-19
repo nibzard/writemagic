@@ -11,6 +11,7 @@ repository.workspace = true
 # Async
 async-trait.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 
 # Serialization
 serde.workspace = true
@@ -39,6 +40,11 @@ sha2.workspace = true
 # Logging
 log.workspace = true
 tracing.workspace = true
+
+# Performance collections
+smallvec.workspace = true
+arrayvec.workspace = true
+bytes.workspace = true
 
 [dev-dependencies]
 tokio-test = "0.4"

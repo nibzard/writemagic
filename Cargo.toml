@@ -13,15 +13,16 @@ members = [
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.70"
+edition = "2024"
+rust-version = "1.84"
 authors = ["WriteMagic Team"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/writemagic/writemagic"
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.44", features = ["full"] }
+tokio-util = { version = "0.7", features = ["full"] }
 async-trait = "0.1"
 
 # Serialization
@@ -31,7 +32,7 @@ serde_yaml = "0.9"
 
 # Error handling
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Database
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid", "macros"], default-features = false }
@@ -46,10 +47,26 @@ reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-feature
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
-# Logging
+# Logging and observability
 log = "0.4"
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-opentelemetry = "0.25"
+opentelemetry = "0.25"
+opentelemetry-otlp = "0.25"
+
+# Performance collections
+bytes = "1.9"
+smallvec = "1.13"
+arrayvec = "0.7"
+
+# Memory management
+once_cell = "1.20"
+pin-project = "1.1"
+
+# Concurrency
+crossbeam = "0.8"
+rayon = "1.10"
 
 # Cross-platform FFI
 cxx = "1.0"
@@ -79,6 +96,24 @@ sha2 = "0.10"
 # iOS specific
 libc = "0.2"
 
+# Use workspace.lints for consistent linting across all crates
+[workspace.lints.rust]
+unsafe_code = "warn"
+missing_docs = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+dead_code = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# Disable annoying lints
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+too_many_lines = "allow"
+missing_errors_doc = "allow"
+
 [profile.release]
 lto = true
 codegen-units = 1
@@ -88,6 +123,19 @@ strip = true
 [profile.dev]
 debug = true
 opt-level = 0
+
+[profile.release-dbg]
+inherits = "release"
+strip = false            # Keep symbols for profiling
+debug = true            # Include debug info
+
+[profile.release-min]
+inherits = "release"
+opt-level = "z"         # Optimize for size
+lto = "fat"             # Link-time optimization
+codegen-units = 1       # Single codegen unit
+panic = "abort"         # No unwinding
+strip = true            # Strip symbols
 
 # Cross-compilation targets
 [workspace.metadata.cross]

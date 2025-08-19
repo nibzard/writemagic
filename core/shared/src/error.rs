@@ -1,6 +1,53 @@
 //! Shared error types and handling
 
 use thiserror::Error;
+use serde::Serialize;
+use std::backtrace::Backtrace;
+use std::fmt;
+
+/// Structured error response for APIs
+#[derive(Debug, Serialize, Clone)]
+pub struct ErrorResponse {
+    pub code: ErrorCode,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
+    pub request_id: Option<String>,
+    pub timestamp: i64,
+}
+
+/// Standard error codes for API responses
+#[derive(Debug, Serialize, Clone, Copy)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ErrorCode {
+    InvalidRequest,
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    Conflict,
+    ValidationFailed,
+    RateLimited,
+    InternalError,
+    ServiceUnavailable,
+    BadGateway,
+}
+
+impl ErrorCode {
+    /// Get HTTP status code for this error code
+    pub const fn status_code(self) -> u16 {
+        match self {
+            Self::InvalidRequest | Self::ValidationFailed => 400,
+            Self::Unauthorized => 401,
+            Self::Forbidden => 403,
+            Self::NotFound => 404,
+            Self::Conflict => 409,
+            Self::RateLimited => 429,
+            Self::InternalError => 500,
+            Self::BadGateway => 502,
+            Self::ServiceUnavailable => 503,
+        }
+    }
+}
 
 /// Main error type for WriteMagic operations
 #[derive(Error, Debug)]
@@ -42,7 +89,24 @@ pub enum WritemagicError {
     Network { message: String },
 
     #[error("Internal error: {message}")]
-    Internal { message: String },
+    Internal { 
+        message: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+        backtrace: Backtrace,
+    },
+
+    #[error("Request timeout after {timeout_ms}ms")]
+    Timeout { timeout_ms: u64 },
+
+    #[error("Resource not found: {resource}")]
+    NotFound { resource: String },
+
+    #[error("Operation cancelled")]
+    Cancelled,
+
+    #[error("Rate limit exceeded: {limit} requests per {window_seconds}s")]
+    RateLimited { limit: u32, window_seconds: u32 },
 }
 
 /// Result type alias for WriteMagic operations
@@ -100,6 +164,69 @@ impl WritemagicError {
     pub fn internal(message: impl Into<String>) -> Self {
         Self::Internal {
             message: message.into(),
+            source: None,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    pub fn internal_with_source<E>(message: impl Into<String>, source: E) -> Self 
+    where 
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        Self::Internal {
+            message: message.into(),
+            source: Some(Box::new(source)),
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    pub fn timeout(timeout_ms: u64) -> Self {
+        Self::Timeout { timeout_ms }
+    }
+
+    pub fn not_found(resource: impl Into<String>) -> Self {
+        Self::NotFound {
+            resource: resource.into(),
+        }
+    }
+
+    pub fn cancelled() -> Self {
+        Self::Cancelled
+    }
+
+    pub fn rate_limited(limit: u32, window_seconds: u32) -> Self {
+        Self::RateLimited { limit, window_seconds }
+    }
+
+    /// Convert to structured error response
+    pub fn to_error_response(&self, request_id: Option<String>) -> ErrorResponse {
+        let (code, details) = match self {
+            Self::Validation { .. } => (ErrorCode::ValidationFailed, None),
+            Self::Authentication { .. } => (ErrorCode::Unauthorized, None),
+            Self::NotFound { resource } => (
+                ErrorCode::NotFound, 
+                Some(serde_json::json!({ "resource": resource }))
+            ),
+            Self::RateLimited { limit, window_seconds } => (
+                ErrorCode::RateLimited,
+                Some(serde_json::json!({
+                    "limit": limit,
+                    "window_seconds": window_seconds
+                }))
+            ),
+            Self::Network { .. } | Self::AiProvider { .. } => (
+                ErrorCode::ServiceUnavailable, 
+                None
+            ),
+            _ => (ErrorCode::InternalError, None),
+        };
+
+        ErrorResponse {
+            code,
+            message: self.to_string(),
+            details,
+            request_id,
+            timestamp: chrono::Utc::now().timestamp(),
         }
     }
 }
