@@ -6,16 +6,22 @@ pub mod value_objects;
 pub mod services;
 pub mod repositories;
 pub mod examples;
+pub mod examples_performance;
 pub mod writing_service;
 pub mod retry_patterns;
 pub mod tokenization;
 pub mod security;
 pub mod circuit_breaker;
+pub mod performance_monitor;
+pub mod request_batcher;
 
 #[cfg(test)]
 mod test_basic;
 #[cfg(test)]
 mod lib_test;
+
+#[cfg(test)]
+mod tests;
 
 // Re-export public types
 pub use providers::*;
@@ -28,3 +34,5 @@ pub use retry_patterns::{RetryConfig, with_retry, with_timeout};
 pub use tokenization::{TokenizationService, ModelTokenizer, TokenUsage, ModelTokenizerConfig};
 pub use security::{SecureKeyManager, PIIDetectionService, ContentSanitizationService, SecurityAuditLogger};
 pub use circuit_breaker::{CircuitBreaker, CircuitBreakerRegistry, CircuitBreakerConfig, CircuitState};
+pub use performance_monitor::{PerformanceMonitor, PerformanceStats, PerformanceThresholds, PerformanceAlerting};
+pub use request_batcher::{RequestBatcher, RequestScheduler, BatchConfig};

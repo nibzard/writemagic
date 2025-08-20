@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.84.0"
-components = ["rustfmt", "clippy", "rust-analyzer"]
-targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "aarch64-linux-android", "armv7-linux-androideabi", "i686-linux-android", "x86_64-linux-android", "aarch64-apple-ios", "x86_64-apple-ios"]
+channel = "nightly"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 profile = "default"

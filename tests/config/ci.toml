@@ -1,0 +1,21 @@
+# CI Configuration for WriteMagic Test Suite
+
+[coordinator]
+max_parallel_suites = 4
+timeout_minutes = 30
+fail_fast = true
+
+[tests]
+coverage_enabled = true
+performance_tests_enabled = false  # Skip in CI to save time
+edge_case_tests_enabled = true
+property_tests_enabled = true
+
+[reporting]
+generate_html_report = true
+output_directory = "target/test-reports"
+
+[quality_gates]
+minimum_coverage = 80.0
+maximum_failure_rate = 5.0
+maximum_duration_minutes = 25

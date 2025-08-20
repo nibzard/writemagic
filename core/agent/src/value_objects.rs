@@ -1,9 +1,10 @@
 //! Agent domain value objects
 
 use writemagic_shared::{WritemagicError, Result};
-use chrono::{DateTime, Utc, Duration};
+// Remove unused chrono imports
+use std::time::Duration;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+// Remove unused BTreeMap import
 use std::fmt;
 
 /// Agent execution priority level
@@ -479,7 +480,7 @@ impl WorkflowValidation {
     /// Validate job count
     pub fn validate_job_count(&self, count: u32) -> Result<()> {
         if count > self.max_job_depth {
-            return Err(WritemagicError::validation(&format!(
+            return Err(WritemagicError::validation(format!(
                 "Too many jobs: {} (max: {})", count, self.max_job_depth
             )));
         }
@@ -489,7 +490,7 @@ impl WorkflowValidation {
     /// Validate variable count
     pub fn validate_variable_count(&self, count: u32) -> Result<()> {
         if count > self.max_variables {
-            return Err(WritemagicError::validation(&format!(
+            return Err(WritemagicError::validation(format!(
                 "Too many variables: {} (max: {})", count, self.max_variables
             )));
         }
@@ -499,7 +500,7 @@ impl WorkflowValidation {
     /// Validate steps per job
     pub fn validate_steps_count(&self, count: u32) -> Result<()> {
         if count > self.max_steps_per_job {
-            return Err(WritemagicError::validation(&format!(
+            return Err(WritemagicError::validation(format!(
                 "Too many steps in job: {} (max: {})", count, self.max_steps_per_job
             )));
         }

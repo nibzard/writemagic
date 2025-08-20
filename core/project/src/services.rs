@@ -1,7 +1,7 @@
 //! Project domain services
 
 use writemagic_shared::{EntityId, WritemagicError, Result};
-use crate::aggregates::{ProjectAggregate, ProjectStatistics};
+use crate::aggregates::{self, ProjectAggregate};
 use crate::entities::{ProjectTemplate};
 use crate::value_objects::{ProjectStatus, ProjectPriority, ProjectGoal, ProjectTag, GoalType};
 use crate::repositories::{ProjectRepository, ProjectTemplateRepository, ProjectFilter, ProjectSearchCriteria};
@@ -200,8 +200,16 @@ impl ProjectManagementService {
     }
     
     /// Get project statistics
-    pub async fn get_project_statistics(&self, project_id: &EntityId) -> Result<ProjectStatistics> {
-        self.project_repository.get_statistics(project_id).await
+    pub async fn get_project_statistics(&self, project_id: &EntityId) -> Result<aggregates::ProjectStatistics> {
+        let _repo_stats = self.project_repository.get_statistics(project_id).await?;
+        
+        // Load the actual project to get real statistics
+        if let Some(project_aggregate) = self.project_repository.load(project_id).await? {
+            // Use the built-in statistics method
+            Ok(project_aggregate.get_statistics())
+        } else {
+            Err(WritemagicError::not_found("Project not found"))
+        }
     }
     
     /// Update goal progress
@@ -351,7 +359,7 @@ impl ProjectAnalyticsService {
         
         let projects = self.project_repository.list(filter).await?;
         
-        let mut metrics = ProductivityMetrics {
+        let metrics = ProductivityMetrics {
             period_start: start_date,
             period_end: end_date,
             projects_created: projects.len(),

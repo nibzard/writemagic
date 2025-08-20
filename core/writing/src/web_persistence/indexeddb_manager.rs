@@ -7,18 +7,18 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, closure::Closure};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::*;
 use futures::Future;
 use std::pin::Pin;
-use js_sys::{Array, Object, Reflect};
+use js_sys::{Array, Object, Reflect, Promise};
 
 use super::schema::{SchemaConfig, ObjectStore, get_schema, WRITEMAGIC_DB_NAME, WRITEMAGIC_DB_VERSION};
 use super::{IndexedDbError, Result, js_error_to_indexeddb_error};
 
 /// Configuration for IndexedDB manager
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IndexedDbConfig {
     pub database_name: String,
     pub version: u32,
@@ -95,7 +95,8 @@ impl IndexedDbManager {
                 feature: "Window object".to_string() 
             })?;
         
-        let indexed_db = window.indexed_db()
+        let indexed_db = window.indexed_db().map_err(|e| js_error_to_indexeddb_error(&e, "Getting IndexedDB"))?
+            .ok_or_else(|| IndexedDbError::Initialization("IndexedDB not supported".to_string()))?
             .map_err(|e| js_error_to_indexeddb_error(&e, "Getting IndexedDB"))?
             .ok_or_else(|| IndexedDbError::UnsupportedFeature {
                 feature: "IndexedDB".to_string()
@@ -180,14 +181,20 @@ impl IndexedDbManager {
         // Get storage estimate if available
         let size_estimate = self.get_storage_estimate().await.ok();
         
-        let object_stores = db.object_store_names()
-            .iter()
-            .map(|name| name.as_string().unwrap_or_default())
-            .collect();
+        let object_stores = {
+            let names = db.object_store_names();
+            let mut stores = Vec::new();
+            for i in 0..names.length() {
+                if let Some(name) = names.get(i) {
+                    stores.push(name.as_string().unwrap_or_default());
+                }
+            }
+            stores
+        };
         
         Ok(DatabaseInfo {
             name: db.name(),
-            version: db.version(),
+            version: db.version() as u32,
             size_estimate,
             object_stores,
         })
@@ -208,7 +215,7 @@ impl IndexedDbManager {
                 // Call navigator.storage.estimate()
                 if let Ok(estimate_method) = Reflect::get(&storage, &"estimate".into()) {
                     if estimate_method.is_function() {
-                        if let Ok(promise) = Reflect::apply(&estimate_method, &storage, &Array::new()) {
+                        if let Ok(promise) = Reflect::apply(&estimate_method.dyn_into().unwrap(), &storage, &Array::new()) {
                             if let Ok(result) = JsFuture::from(promise.dyn_into().unwrap()).await {
                                 if let Ok(usage) = Reflect::get(&result, &"usage".into()) {
                                     if let Some(usage_num) = usage.as_f64() {
@@ -258,9 +265,52 @@ impl IndexedDbManager {
             .map_err(|e| js_error_to_indexeddb_error(&e, &format!("Getting object store {}", store.as_str())))
     }
     
+    /// Helper to convert IdbRequest to Promise
+    fn request_to_promise(&self, request: IdbRequest) -> JsFuture {
+        JsFuture::from(Promise::new(&mut |resolve, reject| {
+            let request_clone = request.clone();
+            let success_closure = Closure::wrap(Box::new(move |_event: Event| {
+                resolve.call1(&JsValue::NULL, &request_clone.result().unwrap_or(JsValue::NULL)).unwrap();
+            }) as Box<dyn FnMut(_)>);
+            
+            let request_clone2 = request.clone();
+            let error_closure = Closure::wrap(Box::new(move |_event: Event| {
+                reject.call1(&JsValue::NULL, &request_clone2.error().unwrap_or(JsValue::NULL)).unwrap();
+            }) as Box<dyn FnMut(_)>);
+            
+            request.set_onsuccess(Some(success_closure.as_ref().unchecked_ref()));
+            request.set_onerror(Some(error_closure.as_ref().unchecked_ref()));
+            
+            success_closure.forget();
+            error_closure.forget();
+        }))
+    }
+
+    /// Helper to convert IdbTransaction to Promise
+    fn transaction_to_promise(&self, transaction: IdbTransaction) -> JsFuture {
+        JsFuture::from(Promise::new(&mut |resolve, reject| {
+            let success_closure = Closure::wrap(Box::new(move |_event: Event| {
+                resolve.call1(&JsValue::NULL, &JsValue::NULL).unwrap();
+            }) as Box<dyn FnMut(_)>);
+            
+            let error_closure = Closure::wrap(Box::new(move |event: Event| {
+                let error = event.target().and_then(|t| t.dyn_into::<IdbTransaction>().ok())
+                    .and_then(|t| t.error())
+                    .unwrap_or(JsValue::from_str("Transaction failed"));
+                reject.call1(&JsValue::NULL, &error).unwrap();
+            }) as Box<dyn FnMut(_)>);
+            
+            transaction.set_oncomplete(Some(success_closure.as_ref().unchecked_ref()));
+            transaction.set_onerror(Some(error_closure.as_ref().unchecked_ref()));
+            
+            success_closure.forget();
+            error_closure.forget();
+        }))
+    }
+
     /// Execute a transaction and wait for completion
     pub async fn execute_transaction(&self, transaction: IdbTransaction) -> Result<()> {
-        let complete_promise = JsFuture::from(transaction);
+        let complete_promise = self.transaction_to_promise(transaction);
         complete_promise.await
             .map_err(|e| js_error_to_indexeddb_error(&e, "Transaction execution"))?;
         
@@ -300,7 +350,7 @@ impl IndexedDbManager {
             let clear_request = object_store.clear()
                 .map_err(|e| js_error_to_indexeddb_error(&e, &format!("Clearing store {}", store.as_str())))?;
             
-            JsFuture::from(clear_request).await
+            self.request_to_promise(clear_request).await
                 .map_err(|e| js_error_to_indexeddb_error(&e, &format!("Clear operation for {}", store.as_str())))?;
         }
         
@@ -320,7 +370,8 @@ impl IndexedDbManager {
                 feature: "Window object".to_string()
             })?;
         
-        let indexed_db = window.indexed_db()
+        let indexed_db = window.indexed_db().map_err(|e| js_error_to_indexeddb_error(&e, "Getting IndexedDB"))?
+            .ok_or_else(|| IndexedDbError::Initialization("IndexedDB not supported".to_string()))?
             .map_err(|e| js_error_to_indexeddb_error(&e, "Getting IndexedDB"))?
             .ok_or_else(|| IndexedDbError::UnsupportedFeature {
                 feature: "IndexedDB".to_string()
@@ -350,7 +401,7 @@ impl IndexedDbManager {
             let get_all_request = object_store.get_all()
                 .map_err(|e| js_error_to_indexeddb_error(&e, &format!("Backing up store {}", store.as_str())))?;
             
-            let store_data = JsFuture::from(get_all_request).await
+            let store_data = self.request_to_promise(get_all_request).await
                 .map_err(|e| js_error_to_indexeddb_error(&e, &format!("Backup operation for {}", store.as_str())))?;
             
             Reflect::set(&backup, &store.as_str().into(), &store_data)
@@ -380,7 +431,7 @@ impl IndexedDbManager {
                         let add_request = object_store.add(&item)
                             .map_err(|e| js_error_to_indexeddb_error(&e, &format!("Restoring item to {}", store.as_str())))?;
                         
-                        JsFuture::from(add_request).await
+                        self.request_to_promise(add_request).await
                             .map_err(|e| js_error_to_indexeddb_error(&e, &format!("Restore operation for {}", store.as_str())))?;
                     }
                 }

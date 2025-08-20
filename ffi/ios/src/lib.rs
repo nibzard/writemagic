@@ -5,13 +5,10 @@ use std::os::raw::{c_char, c_int};
 use std::sync::{Arc, RwLock, OnceLock};
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
-use writemagic_shared::{EntityId, ContentType, Repository, Pagination, Result, WritemagicError};
+use writemagic_shared::{EntityId, ContentType, Pagination, Result, WritemagicError};
 use writemagic_writing::{
-    CoreEngine, ApplicationConfigBuilder, ApplicationConfig, AIConfig,
-    entities::{Document, Project},
-    value_objects::{DocumentTitle, DocumentContent, ProjectName},
-    services::{DocumentManagementService, ProjectManagementService},
-    repositories::{DocumentRepository, ProjectRepository},
+    CoreEngine, ApplicationConfigBuilder,
+    value_objects::{DocumentTitle, DocumentContent},
 };
 
 /// Thread-safe FFI error codes for proper error handling
@@ -54,7 +51,6 @@ impl<T> FFIResult<T> {
 }
 
 /// Thread-safe instance manager for CoreEngine lifecycle
-#[derive(Debug)]
 pub struct FFIInstanceManager {
     engine: Arc<RwLock<CoreEngine>>,
     runtime: Arc<Runtime>,
@@ -69,7 +65,7 @@ impl FFIInstanceManager {
     ) -> Result<Self> {
         let runtime = Arc::new(
             Runtime::new()
-                .map_err(|e| WritemagicError::Infrastructure(format!("Failed to create runtime: {}", e)))?
+                .map_err(|e| WritemagicError::internal(format!("Failed to create runtime: {}", e)))?
         );
         
         let engine = runtime.block_on(async {
@@ -184,7 +180,7 @@ fn init_logging() {
 /// Returns 1 for success, 0 for failure
 #[no_mangle]
 pub extern "C" fn writemagic_initialize_with_ai(
-    use_sqlite: c_int,
+    _use_sqlite: c_int,
     claude_key: *const c_char,
     openai_key: *const c_char,
 ) -> c_int {

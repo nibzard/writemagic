@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
-use tiktoken_rs::{CoreBPE, get_bpe_from_model, tiktoken::get_encoding};
+use tiktoken_rs::{CoreBPE, get_bpe_from_model};
 use writemagic_shared::{Result, WritemagicError};
-use crate::providers::{Message, CompletionRequest};
+use crate::providers::CompletionRequest;
 
 /// Model-specific tokenizer configuration
 #[derive(Debug, Clone)]
@@ -90,7 +90,7 @@ impl ModelTokenizer {
             Ok(encoder) => encoder,
             Err(_) => {
                 // Fallback to cl100k_base encoding if model-specific fails
-                get_encoding(&config.encoding_name)
+                tiktoken_rs::get_bpe_from_model("cl100k_base")
                     .map_err(|e| WritemagicError::internal(format!("Failed to load tokenizer: {}", e)))?
             }
         };
@@ -244,7 +244,7 @@ impl TokenizationService {
         
         // Try prefix matching for model families
         for (registered_model, tokenizer) in &self.tokenizers {
-            if model_name.starts_with(&registered_model.split('-').next().unwrap_or("")) {
+            if model_name.starts_with(registered_model.split('-').next().unwrap_or("")) {
                 return tokenizer.clone();
             }
         }
@@ -294,7 +294,18 @@ impl TokenizationService {
 
 impl Default for TokenizationService {
     fn default() -> Self {
-        Self::new().expect("Failed to create default tokenization service")
+        Self::new().unwrap_or_else(|_| {
+            log::error!("Failed to create tokenization service, using minimal implementation");
+            // Create a minimal default tokenizer
+            let default_config = ModelTokenizerConfig::gpt_4();
+            let default_tokenizer = ModelTokenizer::new(default_config)
+                .unwrap_or_else(|_| panic!("Failed to create default tokenizer"));
+            
+            Self {
+                tokenizers: std::collections::HashMap::new(),
+                default_tokenizer: Arc::new(default_tokenizer),
+            }
+        })
     }
 }
 

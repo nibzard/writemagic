@@ -10,7 +10,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::time::{sleep, timeout};
 
 use crate::extractors::RequestId;
 
@@ -143,35 +142,29 @@ pub async fn rate_limit_middleware(
     match result {
         RateLimitResult::Allowed { remaining, reset_time } => {
             // Add rate limit headers to the request for downstream handlers
-            request.headers_mut().insert(
-                "x-ratelimit-remaining",
-                remaining.to_string().parse().unwrap(),
-            );
-            request.headers_mut().insert(
-                "x-ratelimit-reset",
-                reset_time.to_string().parse().unwrap(),
-            );
+            if let Ok(remaining_header) = remaining.to_string().parse() {
+                request.headers_mut().insert("x-ratelimit-remaining", remaining_header);
+            }
+            if let Ok(reset_header) = reset_time.to_string().parse() {
+                request.headers_mut().insert("x-ratelimit-reset", reset_header);
+            }
 
             // Process the request
             let mut response = next.run(request).await;
 
             // Add rate limit headers to response
-            response.headers_mut().insert(
-                "x-ratelimit-limit",
-                rate_limiter.max_requests.to_string().parse().unwrap(),
-            );
-            response.headers_mut().insert(
-                "x-ratelimit-remaining",
-                remaining.to_string().parse().unwrap(),
-            );
-            response.headers_mut().insert(
-                "x-ratelimit-reset",
-                reset_time.to_string().parse().unwrap(),
-            );
-            response.headers_mut().insert(
-                "x-request-id",
-                request_id.get().parse().unwrap(),
-            );
+            if let Ok(limit_header) = rate_limiter.max_requests.to_string().parse() {
+                response.headers_mut().insert("x-ratelimit-limit", limit_header);
+            }
+            if let Ok(remaining_header) = remaining.to_string().parse() {
+                response.headers_mut().insert("x-ratelimit-remaining", remaining_header);
+            }
+            if let Ok(reset_header) = reset_time.to_string().parse() {
+                response.headers_mut().insert("x-ratelimit-reset", reset_header);
+            }
+            if let Ok(request_id_header) = request_id.get().parse() {
+                response.headers_mut().insert("x-request-id", request_id_header);
+            }
 
             Ok(response)
         }
@@ -203,7 +196,7 @@ fn extract_client_ip(headers: &HeaderMap) -> Option<String> {
     ];
 
     for header_name in &ip_headers {
-        if let Some(header_value) = headers.get(header_name) {
+        if let Some(header_value) = headers.get(*header_name) {
             if let Ok(header_str) = header_value.to_str() {
                 // Handle comma-separated IPs (take the first one)
                 let ip = header_str.split(',').next()?.trim();
@@ -249,18 +242,15 @@ impl IntoResponse for RateLimitError {
                     .into_response();
 
                 // Add retry-after header
-                response.headers_mut().insert(
-                    "retry-after",
-                    retry_after.to_string().parse().unwrap(),
-                );
-                response.headers_mut().insert(
-                    "x-ratelimit-reset",
-                    reset_time.to_string().parse().unwrap(),
-                );
-                response.headers_mut().insert(
-                    "x-request-id",
-                    request_id.parse().unwrap(),
-                );
+                if let Ok(retry_header) = retry_after.to_string().parse() {
+                    response.headers_mut().insert("retry-after", retry_header);
+                }
+                if let Ok(reset_header) = reset_time.to_string().parse() {
+                    response.headers_mut().insert("x-ratelimit-reset", reset_header);
+                }
+                if let Ok(request_id_header) = request_id.parse() {
+                    response.headers_mut().insert("x-request-id", request_id_header);
+                }
 
                 response
             }

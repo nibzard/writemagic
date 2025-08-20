@@ -2,8 +2,8 @@
 
 use writemagic_shared::{EntityId, WritemagicError, Result};
 use crate::aggregates::{ProjectAggregate, ProjectEvent};
-use crate::entities::{Project, ProjectTemplate};
-use crate::value_objects::{ProjectStatus, ProjectPriority, ProjectTag};
+use crate::entities::ProjectTemplate;
+use crate::value_objects::{ProjectStatus, ProjectPriority};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -151,160 +151,137 @@ pub mod implementations {
     use super::*;
     
     /// SQLite implementation of ProjectRepository
+    /// Note: This is a placeholder implementation for future SQLite integration
     pub struct SqliteProjectRepository {
-        // Implementation would contain database connection
-        db_path: String,
+        // TODO: Add actual SQLite connection pool when implementing persistence
+        _phantom: std::marker::PhantomData<()>,
     }
     
     impl SqliteProjectRepository {
-        pub fn new(db_path: String) -> Self {
-            Self { db_path }
+        pub fn new(_db_path: String) -> Self {
+            Self { 
+                _phantom: std::marker::PhantomData,
+            }
         }
     }
     
     #[async_trait]
     impl ProjectRepository for SqliteProjectRepository {
         async fn save(&self, aggregate: &mut ProjectAggregate) -> Result<()> {
-            // Implementation would serialize aggregate and save to SQLite
-            // This is a functional implementation template
+            // TODO: Implement actual SQLite persistence
+            // For now, this is a placeholder that logs the operation
             
-            // 1. Serialize the project aggregate
-            let project_json = serde_json::to_string(aggregate)
-                .map_err(|e| WritemagicError::internal(&format!("Serialization failed: {}", e)))?;
-            
-            // 2. Save to database (pseudo-code)
-            // let mut conn = sqlite::Connection::open(&self.db_path)?;
-            // conn.execute(
-            //     "INSERT OR REPLACE INTO projects (id, data, version, updated_at) VALUES (?, ?, ?, ?)",
-            //     &[&aggregate.id().to_string(), &project_json, &aggregate.version(), &aggregate.project().updated_at]
-            // )?;
-            
-            // 3. Save events if any
+            // Clear events to simulate successful save
             if !aggregate.events().is_empty() {
-                // Save events to event store
-                // self.save_events(aggregate).await?;
                 aggregate.clear_events();
             }
             
-            Ok(())
+            // Return NotImplemented error to be explicit about current state
+            Err(WritemagicError::not_implemented(
+                "SQLite project repository save operation not yet implemented"
+            ))
         }
         
-        async fn load(&self, project_id: &EntityId) -> Result<Option<ProjectAggregate>> {
-            // Implementation would load from SQLite and deserialize
-            // This is a functional implementation template
-            
-            // 1. Query database (pseudo-code)
-            // let mut conn = sqlite::Connection::open(&self.db_path)?;
-            // let result = conn.query_row(
-            //     "SELECT data FROM projects WHERE id = ?",
-            //     &[&project_id.to_string()],
-            //     |row| {
-            //         let data: String = row.get(0)?;
-            //         Ok(data)
-            //     }
-            // );
-            
-            // 2. Deserialize if found
-            // match result {
-            //     Ok(project_json) => {
-            //         let aggregate: ProjectAggregate = serde_json::from_str(&project_json)
-            //             .map_err(|e| WritemagicError::internal(&format!("Deserialization failed: {}", e)))?;
-            //         Ok(Some(aggregate))
-            //     },
-            //     Err(_) => Ok(None)
-            // }
-            
-            // For now, return None as this is a template
-            Ok(None)
+        async fn load(&self, _project_id: &EntityId) -> Result<Option<ProjectAggregate>> {
+            // TODO: Implement actual SQLite loading
+            Err(WritemagicError::not_implemented(
+                "SQLite project repository load operation not yet implemented"
+            ))
         }
         
-        async fn delete(&self, project_id: &EntityId) -> Result<()> {
-            // Implementation would delete from SQLite
-            Ok(())
+        async fn delete(&self, _project_id: &EntityId) -> Result<()> {
+            Err(WritemagicError::not_implemented(
+                "SQLite project repository delete operation not yet implemented"
+            ))
         }
         
-        async fn list(&self, filter: ProjectFilter) -> Result<Vec<ProjectAggregate>> {
-            // Implementation would query with filters and return results
-            Ok(Vec::new())
+        async fn list(&self, _filter: ProjectFilter) -> Result<Vec<ProjectAggregate>> {
+            Err(WritemagicError::not_implemented(
+                "SQLite project repository list operation not yet implemented"
+            ))
         }
         
-        async fn search(&self, criteria: ProjectSearchCriteria) -> Result<Vec<ProjectAggregate>> {
-            // Implementation would perform full-text search
-            Ok(Vec::new())
+        async fn search(&self, _criteria: ProjectSearchCriteria) -> Result<Vec<ProjectAggregate>> {
+            Err(WritemagicError::not_implemented(
+                "SQLite project repository search operation not yet implemented"
+            ))
         }
         
-        async fn get_statistics(&self, project_id: &EntityId) -> Result<ProjectStatistics> {
-            // Implementation would aggregate statistics from database
-            Ok(ProjectStatistics {
-                total_projects: 0,
-                active_projects: 0,
-                completed_projects: 0,
-                archived_projects: 0,
-                average_documents_per_project: 0.0,
-                total_documents: 0,
-                projects_by_priority: std::collections::HashMap::new(),
-                most_common_tags: Vec::new(),
-                recent_activity: Vec::new(),
-            })
+        async fn get_statistics(&self, _project_id: &EntityId) -> Result<ProjectStatistics> {
+            Err(WritemagicError::not_implemented(
+                "SQLite project repository statistics operation not yet implemented"
+            ))
         }
         
-        async fn exists(&self, project_id: &EntityId) -> Result<bool> {
-            // Implementation would check existence in database
-            Ok(false)
+        async fn exists(&self, _project_id: &EntityId) -> Result<bool> {
+            Err(WritemagicError::not_implemented(
+                "SQLite project repository exists operation not yet implemented"
+            ))
         }
     }
     
     /// IndexedDB implementation for web applications
+    /// Note: This is a placeholder implementation for future IndexedDB integration
     pub struct IndexedDBProjectRepository {
-        db_name: String,
+        // TODO: Add actual IndexedDB connection when implementing web persistence
+        _phantom: std::marker::PhantomData<()>,
     }
     
     impl IndexedDBProjectRepository {
-        pub fn new(db_name: String) -> Self {
-            Self { db_name }
+        pub fn new(_db_name: String) -> Self {
+            Self { 
+                _phantom: std::marker::PhantomData,
+            }
         }
     }
     
     #[async_trait]
     impl ProjectRepository for IndexedDBProjectRepository {
         async fn save(&self, aggregate: &mut ProjectAggregate) -> Result<()> {
-            // Implementation would use IndexedDB via wasm-bindgen
-            // This would be similar to SQLite but using browser IndexedDB API
-            Ok(())
+            // Clear events to simulate successful save
+            if !aggregate.events().is_empty() {
+                aggregate.clear_events();
+            }
+            
+            Err(WritemagicError::not_implemented(
+                "IndexedDB project repository save operation not yet implemented"
+            ))
         }
         
-        async fn load(&self, project_id: &EntityId) -> Result<Option<ProjectAggregate>> {
-            Ok(None)
+        async fn load(&self, _project_id: &EntityId) -> Result<Option<ProjectAggregate>> {
+            Err(WritemagicError::not_implemented(
+                "IndexedDB project repository load operation not yet implemented"
+            ))
         }
         
-        async fn delete(&self, project_id: &EntityId) -> Result<()> {
-            Ok(())
+        async fn delete(&self, _project_id: &EntityId) -> Result<()> {
+            Err(WritemagicError::not_implemented(
+                "IndexedDB project repository delete operation not yet implemented"
+            ))
         }
         
-        async fn list(&self, filter: ProjectFilter) -> Result<Vec<ProjectAggregate>> {
-            Ok(Vec::new())
+        async fn list(&self, _filter: ProjectFilter) -> Result<Vec<ProjectAggregate>> {
+            Err(WritemagicError::not_implemented(
+                "IndexedDB project repository list operation not yet implemented"
+            ))
         }
         
-        async fn search(&self, criteria: ProjectSearchCriteria) -> Result<Vec<ProjectAggregate>> {
-            Ok(Vec::new())
+        async fn search(&self, _criteria: ProjectSearchCriteria) -> Result<Vec<ProjectAggregate>> {
+            Err(WritemagicError::not_implemented(
+                "IndexedDB project repository search operation not yet implemented"
+            ))
         }
         
-        async fn get_statistics(&self, project_id: &EntityId) -> Result<ProjectStatistics> {
-            Ok(ProjectStatistics {
-                total_projects: 0,
-                active_projects: 0,
-                completed_projects: 0,
-                archived_projects: 0,
-                average_documents_per_project: 0.0,
-                total_documents: 0,
-                projects_by_priority: std::collections::HashMap::new(),
-                most_common_tags: Vec::new(),
-                recent_activity: Vec::new(),
-            })
+        async fn get_statistics(&self, _project_id: &EntityId) -> Result<ProjectStatistics> {
+            Err(WritemagicError::not_implemented(
+                "IndexedDB project repository statistics operation not yet implemented"
+            ))
         }
         
-        async fn exists(&self, project_id: &EntityId) -> Result<bool> {
-            Ok(false)
+        async fn exists(&self, _project_id: &EntityId) -> Result<bool> {
+            Err(WritemagicError::not_implemented(
+                "IndexedDB project repository exists operation not yet implemented"
+            ))
         }
     }
 }

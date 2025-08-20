@@ -40,37 +40,8 @@ pub fn document_title_strategy() -> impl Strategy<Value = String> {
     ]
 }
 
-/// Generate AI completion requests
-pub fn completion_request_strategy() -> impl Strategy<Value = crate::ai::CompletionRequest> {
-    (
-        prop::collection::vec(message_strategy(), 1..10),
-        model_name_strategy(),
-        prop::option::of(1u32..4000),
-        prop::option::of(0.0f32..2.0f32),
-    ).prop_map(|(messages, model, max_tokens, temperature)| {
-        let mut request = crate::ai::CompletionRequest::new(messages, model);
-        request.max_tokens = max_tokens;
-        request.temperature = temperature;
-        request
-    })
-}
-
-/// Generate AI messages
-pub fn message_strategy() -> impl Strategy<Value = crate::ai::Message> {
-    (
-        message_role_strategy(),
-        document_content_strategy(),
-    ).prop_map(|(role, content)| crate::ai::Message { role, content })
-}
-
-/// Generate message roles
-pub fn message_role_strategy() -> impl Strategy<Value = crate::ai::MessageRole> {
-    prop_oneof![
-        Just(crate::ai::MessageRole::System),
-        Just(crate::ai::MessageRole::User),
-        Just(crate::ai::MessageRole::Assistant),
-    ]
-}
+// Note: AI-related strategies moved to writemagic-ai crate
+// These strategies should be defined in the AI module's tests
 
 /// Generate model names
 pub fn model_name_strategy() -> impl Strategy<Value = String> {
@@ -99,7 +70,7 @@ pub fn file_path_strategy() -> impl Strategy<Value = std::path::PathBuf> {
         Just("/".to_string()),
         Just("".to_string()),
         // Very long paths
-        format!("{}/file.txt", "a".repeat(200)),
+        Just(format!("{}/file.txt", "a".repeat(200))),
     ].prop_map(|s| std::path::PathBuf::from(s))
 }
 
@@ -262,27 +233,11 @@ mod tests {
         }).unwrap();
     }
 
-    #[test] 
-    fn test_completion_request_generation() {
-        let mut runner = TestRunner::new(Config::default());
-        
-        runner.run(&completion_request_strategy(), |request| {
-            // All requests should have at least one message
-            assert!(!request.messages.is_empty());
-            
-            // Temperature should be in valid range if set
-            if let Some(temp) = request.temperature {
-                assert!(temp >= 0.0 && temp <= 2.0);
-            }
-            
-            // Max tokens should be positive if set
-            if let Some(max_tokens) = request.max_tokens {
-                assert!(max_tokens > 0);
-            }
-            
-            Ok(())
-        }).unwrap();
-    }
+    // AI-related tests moved to writemagic-ai crate
+    // #[test] 
+    // fn test_completion_request_generation() {
+    //     // Test moved to AI module
+    // }
 
     #[test]
     fn test_invariant_tester() {

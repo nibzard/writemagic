@@ -1,9 +1,8 @@
 //! Basic functionality tests that don't require network calls
 
-use crate::providers::*;
-use crate::services::*;
-use crate::value_objects::*;
-use writemagic_shared::Result;
+use crate::providers::{CompletionRequest, Message, MessageRole, ClaudeProvider, OpenAIProvider, ResponseCache};
+use crate::services::{ProviderHealth, ContextManagementService, ContentFilteringService, AIProviderRegistry};
+use crate::value_objects::{Prompt, ModelConfiguration};
 
 #[cfg(test)]
 mod tests {
@@ -47,7 +46,7 @@ mod tests {
 
     #[test]
     fn test_model_capabilities() {
-        let claude_provider = ClaudeProvider::new("test-key".to_string());
+        let claude_provider = ClaudeProvider::new("test-key".to_string()).expect("Failed to create Claude provider");
         let capabilities = claude_provider.capabilities();
         
         assert_eq!(capabilities.max_tokens, 100000);
@@ -59,7 +58,7 @@ mod tests {
 
     #[test]
     fn test_openai_capabilities() {
-        let openai_provider = OpenAIProvider::new("test-key".to_string());
+        let openai_provider = OpenAIProvider::new("test-key".to_string()).expect("Failed to create OpenAI provider");
         let capabilities = openai_provider.capabilities();
         
         assert_eq!(capabilities.max_tokens, 4096);
@@ -117,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_context_management() {
-        let context_manager = ContextManagementService::new(50); // Very short limit for testing
+        let context_manager = ContextManagementService::new(50).expect("Failed to create context manager"); // Very short limit for testing
         
         let messages = vec![
             Message::system("System"), // 6 chars
@@ -126,7 +125,7 @@ mod tests {
             Message::user("Recent"), // 6 chars
         ];
         
-        let managed = context_manager.manage_context(messages);
+        let managed = context_manager.manage_context(messages, "test-model").expect("Failed to manage context");
         
         // Should keep system message and recent messages within limit
         let total_length: usize = managed.iter().map(|m| m.content.len()).sum();
@@ -145,11 +144,11 @@ mod tests {
         assert!(filter.is_ok());
     }
 
-    #[test]
-    fn test_provider_registry() {
-        let registry = AIProviderRegistry::new()
-            .with_claude_key("claude-key".to_string())
-            .with_openai_key("openai-key".to_string());
+    #[tokio::test]
+    async fn test_provider_registry() {
+        let mut registry = AIProviderRegistry::new();
+        registry.add_claude_key("claude-key".to_string()).expect("Failed to add Claude key");
+        registry.add_openai_key("openai-key".to_string()).expect("Failed to add OpenAI key");
         
         // Test individual provider creation
         let claude_result = registry.create_claude_provider();
@@ -159,7 +158,7 @@ mod tests {
         assert!(openai_result.is_ok());
         
         // Test orchestration service creation
-        let service_result = registry.create_orchestration_service();
+        let service_result = registry.create_orchestration_service().await;
         assert!(service_result.is_ok());
     }
 

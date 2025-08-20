@@ -293,7 +293,7 @@ class WriteMagicApp {
         this.updateLoadingStatus('Loading optimized WriteMagic engine...');
         
         try {
-            // Use progressive loader for optimized initialization
+            // Use progressive loader for optimized initialization if available
             if (this.progressiveLoader) {
                 const requiredFeatures = [
                     'document', 'project', 'ai_basic'
@@ -305,23 +305,28 @@ class WriteMagicApp {
                     previousSession: localStorage.getItem('writemagic-last-session')
                 };
                 
-                const result = await this.progressiveLoader.startProgressiveLoading(
-                    requiredFeatures, 
-                    userContext
-                );
-                
-                // Initialize WriteMagic with optimized WASM modules
-                const config = {
-                    auto_save_delay: 2000,
-                    enable_analytics: true,
-                    enable_focus_mode: true,
-                    default_layout: 'focus',
-                    enable_keyboard_navigation: true,
-                    enable_accessibility: true,
-                    wasm_modules: result.wasmModules
-                };
-                
-                this.writeMagic = new WriteMagic(config);
+                try {
+                    const result = await this.progressiveLoader.startProgressiveLoading(
+                        requiredFeatures, 
+                        userContext
+                    );
+                    
+                    // Initialize WriteMagic with optimized WASM modules
+                    const config = {
+                        auto_save_delay: 2000,
+                        enable_analytics: true,
+                        enable_focus_mode: true,
+                        default_layout: 'focus',
+                        enable_keyboard_navigation: true,
+                        enable_accessibility: true,
+                        wasm_modules: result.wasmModules
+                    };
+                    
+                    this.writeMagic = new WriteMagic(config);
+                } catch (progressiveError) {
+                    console.warn('[App] Progressive loading failed, using standard initialization:', progressiveError);
+                    await this.initializeWriteMagicStandard();
+                }
                 
             } else {
                 // Fallback to standard initialization
@@ -330,17 +335,23 @@ class WriteMagicApp {
             
             this.setupWriteMagicEventHandlers();
             
-            // Wait for full initialization
-            while (!this.writeMagic.isInitialized) {
+            // Wait for full initialization with timeout
+            let initTimeout = 0;
+            while (!this.writeMagic?.isInitialized && initTimeout < 50) {
                 await new Promise(resolve => setTimeout(resolve, 100));
+                initTimeout++;
+            }
+            
+            if (!this.writeMagic?.isInitialized) {
+                throw new Error('WriteMagic initialization timeout');
             }
             
             console.log('[App] WriteMagic initialized with optimizations');
             
         } catch (error) {
             console.error('[App] Optimized WriteMagic initialization failed:', error);
-            // Fallback to standard initialization
-            await this.initializeWriteMagicStandard();
+            // Fallback to mock mode for demo purposes
+            await this.initializeWriteMagicMockMode();
         }
     }
 
@@ -360,6 +371,197 @@ class WriteMagicApp {
         };
         
         this.writeMagic = new WriteMagic(config);
+    }
+
+    /**
+     * Mock mode initialization for demo purposes
+     */
+    async initializeWriteMagicMockMode() {
+        this.updateLoadingStatus('Loading WriteMagic demo mode...');
+        
+        console.log('[App] Initializing WriteMagic in mock mode for PWA demo');
+        
+        // Create a mock WriteMagic instance with basic functionality
+        this.writeMagic = {
+            isInitialized: true,
+            config: {
+                auto_save_delay: 2000,
+                enable_analytics: true,
+                enable_focus_mode: true,
+                default_layout: 'focus'
+            },
+            
+            // Mock document management
+            async createDocument(options = {}) {
+                const doc = {
+                    id: 'demo-' + Date.now(),
+                    title: options.title || 'New Document',
+                    content: options.content || '',
+                    type: options.type || 'markdown',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                console.log('[MockWriteMagic] Created document:', doc);
+                return doc;
+            },
+            
+            async loadDocument(documentId) {
+                console.log('[MockWriteMagic] Loading document:', documentId);
+                return {
+                    id: documentId,
+                    title: 'Welcome to WriteMagic',
+                    content: this.elements.mainEditor?.value || '',
+                    type: 'markdown'
+                };
+            },
+            
+            updateDocumentContent(documentId, content) {
+                console.log('[MockWriteMagic] Updating document content:', documentId);
+                return true;
+            },
+            
+            async saveDocument(documentId) {
+                console.log('[MockWriteMagic] Saving document:', documentId);
+                await new Promise(resolve => setTimeout(resolve, 500)); // Simulate save delay
+                return true;
+            },
+            
+            async listDocuments() {
+                return [{
+                    id: 'welcome',
+                    title: 'Welcome to WriteMagic',
+                    type: 'markdown',
+                    created_at: new Date().toISOString()
+                }];
+            },
+            
+            // Mock project management
+            async createProject(name, description) {
+                console.log('[MockWriteMagic] Creating project:', name);
+                return {
+                    id: 'project-' + Date.now(),
+                    name,
+                    description: description || '',
+                    created_at: new Date().toISOString()
+                };
+            },
+            
+            // Mock AI features
+            async completeText(prompt, options = {}) {
+                console.log('[MockWriteMagic] AI completion request:', prompt);
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate AI delay
+                return {
+                    content: 'This is a demo response. In the full version, AI would provide intelligent writing assistance.',
+                    model: 'demo-model',
+                    tokensUsed: 25
+                };
+            },
+            
+            async getWritingSuggestions(content, suggestionType) {
+                console.log('[MockWriteMagic] Getting writing suggestions:', suggestionType);
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                const suggestions = {
+                    improve: 'Consider varying sentence length and using more active voice.',
+                    expand: 'You could add more specific examples and descriptive details.',
+                    summarize: 'The main points are: [key points would be extracted here]',
+                    grammar: 'No grammar errors detected in this demo mode.',
+                    rewrite: 'Here is a clearer version: [rewritten text would appear here]'
+                };
+                
+                return {
+                    content: suggestions[suggestionType] || suggestions.improve
+                };
+            },
+            
+            async checkAIHealth() {
+                return { status: 'demo', message: 'Demo mode - AI features simulated' };
+            },
+            
+            // Mock content analysis
+            analyzeContent(content) {
+                const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+                return {
+                    wordCount,
+                    characterCount: content.length,
+                    paragraphCount: content.split(/\n\s*\n/).length,
+                    readingTime: Math.ceil(wordCount / 250),
+                    complexity: {
+                        gradeLevel: 8,
+                        description: 'College level'
+                    }
+                };
+            },
+            
+            countWords(text) {
+                return text.split(/\s+/).filter(word => word.length > 0).length;
+            },
+            
+            estimateReadingTime(content, wpm = 250) {
+                const words = this.countWords(content);
+                return Math.ceil(words / wpm);
+            },
+            
+            // Mock session management
+            startWritingSession(options = {}) {
+                console.log('[MockWriteMagic] Starting writing session:', options);
+                return {
+                    id: 'session-' + Date.now(),
+                    startTime: Date.now(),
+                    duration: options.duration || 1500,
+                    goal: options.goal
+                };
+            },
+            
+            endWritingSession() {
+                console.log('[MockWriteMagic] Ending writing session');
+                return {
+                    id: 'session-ended',
+                    duration: 300,
+                    statistics: {
+                        wordsAdded: 150,
+                        timeSpent: 300
+                    }
+                };
+            },
+            
+            setLayout(layoutName) {
+                console.log('[MockWriteMagic] Setting layout:', layoutName);
+                return true;
+            },
+            
+            // Event system
+            eventCallbacks: new Map(),
+            
+            on(event, callback) {
+                if (!this.eventCallbacks.has(event)) {
+                    this.eventCallbacks.set(event, new Set());
+                }
+                this.eventCallbacks.get(event).add(callback);
+                return this;
+            },
+            
+            off(event, callback) {
+                if (this.eventCallbacks.has(event)) {
+                    this.eventCallbacks.get(event).delete(callback);
+                }
+                return this;
+            },
+            
+            emit(event, data) {
+                if (this.eventCallbacks.has(event)) {
+                    for (const callback of this.eventCallbacks.get(event)) {
+                        try {
+                            callback(data);
+                        } catch (error) {
+                            console.error(`[MockWriteMagic] Error in event callback for '${event}':`, error);
+                        }
+                    }
+                }
+            }
+        };
+        
+        console.log('[App] WriteMagic mock mode initialized successfully');
     }
 
     /**

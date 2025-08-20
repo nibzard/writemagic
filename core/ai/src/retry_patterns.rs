@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use tokio::time::Sleep;
-use writemagic_shared::{Result, WritemagicError};
+use writemagic_shared::WritemagicError;
 
 /// Exponential backoff retry configuration
 #[derive(Debug, Clone)]
@@ -85,6 +85,7 @@ pub struct CircuitBreaker {
     state: CircuitState,
     failure_count: usize,
     success_count: usize,
+    #[allow(dead_code)] // TODO: Implement circuit breaker scheduling in Phase 2
     next_attempt: Option<Instant>,
 }
 

@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, PaginatorTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::entities::{user, User};
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, Result as AppResult};
 use crate::state::AppState;
 use crate::utils::crypto::{Claims, JwtKeys, PasswordHasher, TokenManager, TokenPair};
 
@@ -96,7 +96,7 @@ impl AuthService {
         };
 
         let user = user_model.insert(&state.db).await
-            .map_err(|e| AppError::Database(format!("Failed to create user: {}", e)))?;
+            .map_err(|e| AppError::Database(writemagic_shared::WritemagicError::database(format!("Failed to create user: {}", e))))?;
 
         // Generate tokens
         let tokens = TokenManager::generate_token_pair(&self.jwt_keys, &user.id, &user.username)?;
@@ -171,7 +171,7 @@ impl AuthService {
             .filter(user::Column::Username.eq(username))
             .count(&state.db)
             .await
-            .map_err(|e| AppError::Database(format!("Failed to check username existence: {}", e)))?;
+            .map_err(|e| AppError::Database(writemagic_shared::WritemagicError::database(format!("Failed to check username existence: {}", e))))?;
         
         Ok(count > 0)
     }
@@ -181,7 +181,7 @@ impl AuthService {
             .filter(user::Column::Email.eq(email))
             .count(&state.db)
             .await
-            .map_err(|e| AppError::Database(format!("Failed to check email existence: {}", e)))?;
+            .map_err(|e| AppError::Database(writemagic_shared::WritemagicError::database(format!("Failed to check email existence: {}", e))))?;
         
         Ok(count > 0)
     }
@@ -192,7 +192,7 @@ impl AuthService {
             .filter(user::Column::IsActive.eq(true))
             .one(&state.db)
             .await
-            .map_err(|e| AppError::Database(format!("Failed to find user by username: {}", e)))?;
+            .map_err(|e| AppError::Database(writemagic_shared::WritemagicError::database(format!("Failed to find user by username: {}", e))))?;
         
         Ok(user)
     }
@@ -202,7 +202,7 @@ impl AuthService {
             .filter(user::Column::IsActive.eq(true))
             .one(&state.db)
             .await
-            .map_err(|e| AppError::Database(format!("Failed to find user by ID: {}", e)))?;
+            .map_err(|e| AppError::Database(writemagic_shared::WritemagicError::database(format!("Failed to find user by ID: {}", e))))?;
         
         Ok(user)
     }

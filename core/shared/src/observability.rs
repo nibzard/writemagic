@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, debug, instrument, Span};
+use tracing::{info, warn, debug, instrument, Span};
 use serde::{Serialize, Deserialize};
 
 /// Comprehensive tracing setup for production systems
@@ -23,7 +23,8 @@ pub mod tracing_setup {
         let filter = EnvFilter::try_from_default_env()
             .unwrap_or_else(|_| "info,writemagic=debug".into());
         
-        let fmt_layer = fmt::layer()
+        // Console output with JSON formatting
+        let console_layer = fmt::layer()
             .with_target(true)
             .with_thread_ids(true)
             .with_thread_names(true)
@@ -32,13 +33,6 @@ pub mod tracing_setup {
             .with_level(true)
             .with_ansi(atty::is(atty::Stream::Stdout))
             .json();
-        
-        let mut layers = Vec::new();
-        
-        // Console output
-        let console_layer = fmt::layer()
-            .with_writer(std::io::stdout)
-            .compact();
         
         // File output with rotation
         #[cfg(feature = "file-logging")]
@@ -66,7 +60,7 @@ pub mod tracing_setup {
                 use opentelemetry_otlp::WithExportConfig;
                 use tracing_opentelemetry::OpenTelemetryLayer;
                 
-                let tracer = opentelemetry_otlp::new_pipeline()
+                let tracer_result = opentelemetry_otlp::new_pipeline()
                     .tracing()
                     .with_exporter(
                         opentelemetry_otlp::new_exporter()
@@ -80,8 +74,16 @@ pub mod tracing_setup {
                                 opentelemetry::KeyValue::new("service.version", version.to_string()),
                             ]))
                     )
-                    .install_batch(opentelemetry::runtime::Tokio)
-                    .expect("Failed to initialize tracer");
+                    .install_batch(opentelemetry::runtime::Tokio);
+                
+                let tracer = match tracer_result {
+                    Ok(tracer) => tracer,
+                    Err(e) => {
+                        log::error!("Failed to initialize OpenTelemetry tracer: {}", e);
+                        registry.init();
+                        return;
+                    }
+                };
                 
                 let telemetry_layer = OpenTelemetryLayer::new(tracer);
                 registry.with(telemetry_layer).init();

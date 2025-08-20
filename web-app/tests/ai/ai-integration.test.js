@@ -1,23 +1,23 @@
 /**
  * AI Integration tests for WriteMagic web application
- * Tests AI proxy integration, provider fallback, and AI-assisted writing features
+ * Tests WASM-based AI integration, provider fallback, and AI-assisted writing features
+ * 
+ * Note: AI functionality integrated through WASM core instead of separate proxy service
  */
 
-import { AIProxyIntegration } from '@/ai-proxy-integration.js';
 import { WritingSession } from '@/writing-session.js';
 
-// Mock fetch for AI API calls
+// Mock fetch for AI API calls (now handled through WASM interface)
 global.fetch = jest.fn();
 
 describe('AI Integration Tests', () => {
-  let aiIntegration;
   let writingSession;
 
   beforeEach(() => {
     // Reset fetch mock
     global.fetch.mockClear();
     
-    // Mock WASM modules
+    // Mock WASM modules with AI integration
     global.writemagic_wasm = {
       WritingSession: {
         new: jest.fn(() => ({
@@ -26,48 +26,38 @@ describe('AI Integration Tests', () => {
           get_analytics: jest.fn().mockReturnValue('{}'),
           free: jest.fn()
         }))
+      },
+      // Mock WASM AI integration
+      AIProvider: {
+        new: jest.fn(() => ({
+          generate_completion: jest.fn(),
+          test_connection: jest.fn(),
+          validate_provider: jest.fn()
+        }))
       }
     };
 
-    // Mock AI proxy configuration
-    const mockConfig = {
-      aiProxyUrl: 'http://localhost:3001',
-      providers: ['claude', 'openai', 'local'],
-      defaultProvider: 'claude',
-      timeout: 10000,
-      retryAttempts: 3
-    };
-
-    aiIntegration = new AIProxyIntegration(mockConfig);
     writingSession = new WritingSession();
   });
 
   describe('AI Provider Connection', () => {
-    test('should successfully connect to AI proxy', async () => {
-      // Mock successful connection response
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+    test('should successfully connect to AI providers through WASM', async () => {
+      // Mock WASM AI provider connection
+      global.writemagic_wasm.AIProvider.new.mockReturnValue({
+        test_connection: jest.fn().mockResolvedValue({
           status: 'connected',
           availableProviders: ['claude', 'openai'],
           defaultProvider: 'claude'
         })
       });
 
-      const connectionResult = await aiIntegration.testConnection();
+      const aiProvider = global.writemagic_wasm.AIProvider.new();
+      const connectionResult = await aiProvider.test_connection();
       
-      expect(connectionResult.connected).toBe(true);
+      expect(connectionResult.status).toBe('connected');
       expect(connectionResult.availableProviders).toContain('claude');
       expect(connectionResult.availableProviders).toContain('openai');
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:3001/api/ai/health',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json'
-          })
-        })
-      );
+      expect(global.writemagic_wasm.AIProvider.new).toHaveBeenCalled();
     });
 
     test('should handle connection failure gracefully', async () => {

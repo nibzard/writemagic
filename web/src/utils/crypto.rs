@@ -1,5 +1,5 @@
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher as Argon2PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, Result as AppResult};
 
 /// JWT Claims structure
 #[derive(Debug, Serialize, Deserialize, Clone)]

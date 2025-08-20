@@ -1,25 +1,36 @@
 //! Agent domain entities
 
 use writemagic_shared::{EntityId, WritemagicError, Result};
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Utc};
+use std::time::Duration;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::BTreeMap;
 use garde::Validate;
 
 /// An agent that executes YAML-based workflows and automation tasks
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct Agent {
+    #[garde(skip)]
     pub id: EntityId,
     #[garde(length(min = 1, max = 100))]
     pub name: String,
+    #[garde(skip)]
     pub description: Option<String>,
+    #[garde(skip)]
     pub workflow: AgentWorkflow,
+    #[garde(skip)]
     pub config: AgentConfig,
+    #[garde(skip)]
     pub state: AgentState,
+    #[garde(skip)]
     pub metadata: AgentMetadata,
+    #[garde(skip)]
     pub created_at: DateTime<Utc>,
+    #[garde(skip)]
     pub updated_at: DateTime<Utc>,
+    #[garde(skip)]
     pub created_by: EntityId,
+    #[garde(skip)]
     pub is_active: bool,
 }
 
@@ -386,7 +397,7 @@ impl Agent {
             }
             
             if job.steps.len() > 20 {
-                return Err(WritemagicError::validation(&format!(
+                return Err(WritemagicError::validation(format!(
                     "Too many steps in job '{}': {} (max: 20)", 
                     job_name, 
                     job.steps.len()
@@ -395,7 +406,7 @@ impl Agent {
             
             // Check for circular dependencies
             if job.depends_on.contains(job_name) {
-                return Err(WritemagicError::validation(&format!(
+                return Err(WritemagicError::validation(format!(
                     "Job '{}' cannot depend on itself",
                     job_name
                 )));
@@ -470,7 +481,7 @@ impl Agent {
         self.state.execution_count += 1;
         
         match &result {
-            ExecutionResult::Success { duration, .. } => {
+            ExecutionResult::Success { .. } => {
                 self.metadata.successful_executions += 1;
             },
             ExecutionResult::Failure { .. } => {

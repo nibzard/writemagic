@@ -9,7 +9,7 @@ use axum::{
 use crate::{
     extractors::AuthenticatedUser,
     state::AppState,
-    websocket::{ConnectionManager, WebSocketConnection},
+    websocket::WebSocketConnection,
 };
 
 /// Handle WebSocket upgrade and connection

@@ -20,6 +20,9 @@ pub enum AppError {
     #[error("Authentication required")]
     Unauthorized,
     
+    #[error("Authentication error: {0}")]
+    Authentication(String),
+    
     #[error("Insufficient permissions")]
     Forbidden,
     
@@ -40,6 +43,9 @@ pub enum AppError {
     
     #[error("External service error: {0}")]
     ExternalService(String),
+    
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
     
     #[error("JWT error: {0}")]
     Jwt(#[from] jsonwebtoken::errors::Error),
@@ -93,6 +99,12 @@ impl IntoResponse for AppError {
                 "Authentication required".to_string(),
                 None,
             ),
+            AppError::Authentication(msg) => (
+                StatusCode::UNAUTHORIZED,
+                "AUTHENTICATION_ERROR",
+                msg.clone(),
+                None,
+            ),
             AppError::Forbidden => (
                 StatusCode::FORBIDDEN,
                 "FORBIDDEN",
@@ -138,6 +150,12 @@ impl IntoResponse for AppError {
                     Some(json!({"service": service})),
                 )
             }
+            AppError::NotImplemented(msg) => (
+                StatusCode::NOT_IMPLEMENTED,
+                "NOT_IMPLEMENTED",
+                msg.clone(),
+                None,
+            ),
             AppError::Jwt(e) => {
                 tracing::warn!("JWT error: {}", e);
                 (

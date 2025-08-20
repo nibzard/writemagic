@@ -144,11 +144,11 @@ impl StaticServiceRegistry {
 }
 
 /// Reference to a static service that avoids Arc overhead
-pub struct StaticServiceRef<T: Send + Sync> {
+pub struct StaticServiceRef<T: Send + Sync + 'static> {
     service: &'static T,
 }
 
-impl<T: Send + Sync> StaticServiceRef<T> {
+impl<T: Send + Sync + 'static> StaticServiceRef<T> {
     fn new(service: &'static T) -> Self {
         Self { service }
     }

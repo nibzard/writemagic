@@ -1,8 +1,8 @@
 //! AI domain entities
 
 use serde::{Deserialize, Serialize};
-use writemagic_shared::{EntityId, Timestamp, Entity, AggregateRoot, Auditable, Versioned};
-use crate::providers::{CompletionRequest, CompletionResponse, Usage};
+use writemagic_shared::{EntityId, Timestamp, Entity, AggregateRoot, Versioned};
+use crate::providers::{CompletionRequest, CompletionResponse};
 
 /// AI conversation entity
 #[derive(Debug, Clone, Serialize, Deserialize)]

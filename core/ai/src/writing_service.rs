@@ -1,15 +1,14 @@
 //! AI Writing Service - bridges AI providers with writing domain functionality
 
-use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use writemagic_shared::{EntityId, Result, WritemagicError};
 use serde::{Serialize, Deserialize};
 
-use crate::providers::{AIProvider, CompletionRequest, CompletionResponse, Message, MessageRole};
+use crate::providers::{CompletionRequest, CompletionResponse, Message};
 use crate::services::{AIOrchestrationService, ContextManagementService, ContentFilteringService};
-use crate::value_objects::{Prompt, ModelConfiguration, TokenCount};
+use crate::value_objects::{ModelConfiguration, TokenCount};
 
 // Forward declarations to avoid circular dependencies
 // These will be imported where the service is used
@@ -301,6 +300,7 @@ pub struct AIWritingService {
     context_service: Arc<ContextManagementService>,
     content_filter: Arc<ContentFilteringService>,
     conversation_sessions: Arc<RwLock<HashMap<EntityId, ConversationSession>>>,
+    #[allow(dead_code)] // Used for user preference fallbacks and initialization
     default_preferences: WritingPreferences,
 }
 
@@ -388,9 +388,11 @@ impl AIWritingService {
             assistance_type: WritingAssistanceType::ContentGeneration,
             user_input: Some(prompt),
             model_config: target_length.map(|length| {
-                ModelConfiguration::new("claude-3-5-sonnet-20241022")
-                    .unwrap()
-                    .with_max_tokens(length)
+                match ModelConfiguration::new("claude-3-5-sonnet-20241022") {
+                    Ok(config) => config.with_max_tokens(length),
+                    Err(_) => ModelConfiguration::default()
+                        .with_max_tokens(length)
+                }
             }),
             stream_response: false,
         };
@@ -426,9 +428,11 @@ impl AIWritingService {
             assistance_type: WritingAssistanceType::Summarization,
             user_input: None,
             model_config: summary_length.map(|length| {
-                ModelConfiguration::new("claude-3-haiku-20240307")
-                    .unwrap()
-                    .with_max_tokens(length)
+                match ModelConfiguration::new("claude-3-haiku-20240307") {
+                    Ok(config) => config.with_max_tokens(length),
+                    Err(_) => ModelConfiguration::default()
+                        .with_max_tokens(length)
+                }
             }),
             stream_response: false,
         };
@@ -464,7 +468,7 @@ impl AIWritingService {
             user_input: None,
             model_config: Some(
                 ModelConfiguration::new("gpt-4")
-                    .unwrap()
+                    .unwrap_or_else(|_| ModelConfiguration::default())
                     .with_temperature(0.1) // Lower temperature for grammar checking
             ),
             stream_response: false,
@@ -508,7 +512,7 @@ impl AIWritingService {
             user_input: Some("Provide detailed analysis of tone, key points, and sentiment".to_string()),
             model_config: Some(
                 ModelConfiguration::new("claude-3-5-sonnet-20241022")
-                    .unwrap()
+                    .unwrap_or_else(|_| ModelConfiguration::default())
                     .with_temperature(0.3)
             ),
             stream_response: false,
@@ -557,7 +561,10 @@ impl AIWritingService {
         messages.push(Message::user(user_message));
 
         // Apply context management to fit within token limits
-        let managed_messages = self.context_service.manage_context(messages);
+        let model_name = request.model_config.as_ref()
+            .map(|config| config.model_name.as_str())
+            .unwrap_or("claude-3-sonnet-20240229");
+        let managed_messages = self.context_service.manage_context(messages, model_name)?;
 
         Ok(managed_messages)
     }
@@ -723,25 +730,25 @@ impl AIWritingService {
         match assistance_type {
             WritingAssistanceType::ContentGeneration | WritingAssistanceType::Brainstorming => {
                 ModelConfiguration::new("claude-3-5-sonnet-20241022")
-                    .unwrap()
+                    .unwrap_or_else(|_| ModelConfiguration::default())
                     .with_temperature(0.8)
                     .with_max_tokens(4000)
             }
             WritingAssistanceType::GrammarCheck | WritingAssistanceType::StyleSuggestions => {
                 ModelConfiguration::new("gpt-4")
-                    .unwrap()
+                    .unwrap_or_else(|_| ModelConfiguration::default())
                     .with_temperature(0.1)
                     .with_max_tokens(2000)
             }
             WritingAssistanceType::Summarization => {
                 ModelConfiguration::new("claude-3-haiku-20240307")
-                    .unwrap()
+                    .unwrap_or_else(|_| ModelConfiguration::default())
                     .with_temperature(0.3)
                     .with_max_tokens(1000)
             }
             _ => {
                 ModelConfiguration::new("claude-3-5-sonnet-20241022")
-                    .unwrap()
+                    .unwrap_or_else(|_| ModelConfiguration::default())
                     .with_temperature(0.5)
                     .with_max_tokens(3000)
             }
@@ -1020,11 +1027,12 @@ mod tests {
     }
 
     #[test]
-    fn test_text_selection_in_context() {
-        let selection = TextSelection::new(0, 10).unwrap();
+    fn test_text_selection_in_context() -> Result<()> {
+        let selection = TextSelection::new(0, 10)?;
         let content = "This is a test document content.";
         let extracted = selection.extract_from(content);
         
         assert_eq!(extracted, Some("This is a ".to_string()));
+        Ok(())
     }
 }

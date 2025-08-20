@@ -166,7 +166,7 @@ impl CircuitBreaker {
     {
         if !self.can_execute().await {
             self.update_metrics_request_blocked();
-            return Err(WritemagicError::circuit_breaker(format!(
+            return Err(WritemagicError::internal(format!(
                 "Circuit breaker '{}' is open",
                 self.name
             )));
@@ -174,7 +174,15 @@ impl CircuitBreaker {
 
         let start = Instant::now();
         let _permit = if matches!(*self.state.read(), CircuitState::HalfOpen { .. }) {
-            Some(self.half_open_semaphore.acquire().await.unwrap())
+            match self.half_open_semaphore.acquire().await {
+                Ok(permit) => Some(permit),
+                Err(_) => {
+                    return Err(WritemagicError::internal(format!(
+                        "Failed to acquire semaphore permit for circuit breaker '{}'",
+                        self.name
+                    )));
+                }
+            }
         } else {
             None
         };
@@ -190,7 +198,7 @@ impl CircuitBreaker {
             }
             Ok(Err(e)) => {
                 self.record_failure(duration, Some(e.to_string())).await;
-                Err(WritemagicError::external(e.to_string()))
+                Err(WritemagicError::internal(e.to_string()))
             }
             Err(_) => {
                 self.record_failure(duration, Some("timeout".to_string())).await;
@@ -218,25 +226,22 @@ impl CircuitBreaker {
         
         // Update state based on successes
         let mut state = self.state.write();
-        match &*state {
-            CircuitState::HalfOpen { attempts } => {
-                if *consecutive_successes >= self.config.success_threshold {
-                    *state = CircuitState::Closed;
-                    *consecutive_successes = 0;
-                    self.update_metrics_circuit_close();
-                    tracing::info!("Circuit breaker '{}' closed after successful recovery", self.name);
-                } else {
-                    *state = CircuitState::HalfOpen { attempts: attempts + 1 };
-                }
+        if let CircuitState::HalfOpen { attempts } = &*state {
+            if *consecutive_successes >= self.config.success_threshold {
+                *state = CircuitState::Closed;
+                *consecutive_successes = 0;
+                self.update_metrics_circuit_close();
+                tracing::info!("Circuit breaker '{}' closed after successful recovery", self.name);
+            } else {
+                *state = CircuitState::HalfOpen { attempts: attempts + 1 };
             }
-            _ => {}
         }
         
         self.update_metrics_success(duration);
         
         // Emit metrics
-        counter!("circuit_breaker_requests_total", &[("name", &self.name), ("result", "success")]).increment(1);
-        histogram!("circuit_breaker_request_duration", &[("name", &self.name)]).record(duration.as_millis() as f64);
+        counter!("circuit_breaker_requests_total", 1, &[("name", self.name.clone()), ("result", "success".to_string())]);
+        histogram!("circuit_breaker_request_duration", duration.as_millis() as f64, &[("name", self.name.clone())]);
     }
 
     /// Record failed operation
@@ -277,8 +282,8 @@ impl CircuitBreaker {
         self.update_metrics_failure(duration);
         
         // Emit metrics
-        counter!("circuit_breaker_requests_total", &[("name", &self.name), ("result", "failure")]).increment(1);
-        histogram!("circuit_breaker_request_duration", &[("name", &self.name)]).record(duration.as_millis() as f64);
+        counter!("circuit_breaker_requests_total", 1, &[("name", self.name.clone()), ("result", "failure".to_string())]);
+        histogram!("circuit_breaker_request_duration", duration.as_millis() as f64, &[("name", self.name.clone())]);
     }
 
     /// Check if circuit should open based on failure rate
@@ -319,7 +324,8 @@ impl CircuitBreaker {
         
         // Limit total outcomes to prevent unbounded growth
         if outcomes.len() > 1000 {
-            outcomes.drain(0..outcomes.len() - 800);
+            let excess = outcomes.len() - 800;
+            outcomes.drain(0..excess);
         }
     }
 
@@ -420,22 +426,22 @@ impl CircuitBreaker {
 
     fn update_metrics_circuit_open(&self) {
         self.metrics.write().circuit_opens += 1;
-        gauge!("circuit_breaker_state", &[("name", &self.name)]).set(1.0); // 1.0 = open
+        gauge!("circuit_breaker_state", 1.0, &[("name", self.name.clone())]); // 1.0 = open
     }
 
     fn update_metrics_circuit_close(&self) {
         self.metrics.write().circuit_closes += 1;
-        gauge!("circuit_breaker_state", &[("name", &self.name)]).set(0.0); // 0.0 = closed
+        gauge!("circuit_breaker_state", 0.0, &[("name", self.name.clone())]); // 0.0 = closed
     }
 
     fn update_metrics_half_open_transition(&self) {
         self.metrics.write().half_open_transitions += 1;
-        gauge!("circuit_breaker_state", &[("name", &self.name)]).set(0.5); // 0.5 = half-open
+        gauge!("circuit_breaker_state", 0.5, &[("name", self.name.clone())]); // 0.5 = half-open
     }
 
     fn update_metrics_request_blocked(&self) {
         self.metrics.write().requests_blocked += 1;
-        counter!("circuit_breaker_requests_blocked", &[("name", &self.name)]).increment(1);
+        counter!("circuit_breaker_requests_blocked", 1, &[("name", self.name.clone())]);
     }
 }
 

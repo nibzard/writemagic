@@ -3,9 +3,10 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use writemagic_shared::{Result, WritemagicError};
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::DefaultHasher};
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
 use dashmap::DashMap;
@@ -19,6 +20,12 @@ pub trait AIProvider: Send + Sync {
     /// Complete a request with the AI provider
     async fn complete(&self, request: &CompletionRequest) -> Result<CompletionResponse>;
 
+    /// Stream a completion request (returns async stream of partial responses)
+    async fn stream(&self, request: &CompletionRequest) -> Result<Box<dyn StreamingResponse>>;
+
+    /// Batch multiple requests for efficient processing
+    async fn batch_complete(&self, requests: Vec<CompletionRequest>) -> Result<Vec<Result<CompletionResponse>>>;
+
     /// Get provider capabilities
     fn capabilities(&self) -> ModelCapabilities;
 
@@ -27,6 +34,52 @@ pub trait AIProvider: Send + Sync {
 
     /// Get usage statistics
     async fn get_usage_stats(&self) -> Result<UsageStats>;
+
+    /// Check if provider supports streaming
+    fn supports_streaming(&self) -> bool {
+        self.capabilities().supports_streaming
+    }
+
+    /// Check if provider supports batching
+    fn supports_batching(&self) -> bool {
+        true // Most providers support batching at the API level
+    }
+
+    /// Get provider health metrics
+    async fn health_check(&self) -> Result<ProviderHealthMetrics>;
+}
+
+/// Streaming response trait for real-time completions
+#[async_trait]
+pub trait StreamingResponse: Send + Sync {
+    /// Get next streaming chunk
+    async fn next_chunk(&mut self) -> Result<Option<StreamingChunk>>;
+    
+    /// Check if stream is complete
+    fn is_complete(&self) -> bool;
+    
+    /// Get accumulated response so far
+    fn get_partial_response(&self) -> String;
+}
+
+/// Streaming chunk from AI provider
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamingChunk {
+    pub content: String,
+    pub finish_reason: Option<FinishReason>,
+    pub usage: Option<Usage>,
+}
+
+
+/// Provider health metrics for monitoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderHealthMetrics {
+    pub is_healthy: bool,
+    pub response_time_ms: u64,
+    pub success_rate: f64,
+    pub error_count: u64,
+    pub last_error: Option<String>,
+    pub timestamp: std::time::SystemTime,
 }
 
 /// Completion request structure
@@ -42,6 +95,23 @@ pub struct CompletionRequest {
     pub stop: Option<Vec<String>>,
     pub stream: bool,
     pub metadata: HashMap<String, String>,
+    /// Request priority for load balancing
+    pub priority: RequestPriority,
+    /// Request timeout override
+    pub timeout: Option<Duration>,
+    /// Enable response compression
+    pub compress_response: bool,
+    /// Request batching hint
+    pub batchable: bool,
+}
+
+/// Request priority levels for intelligent routing
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RequestPriority {
+    Low = 0,
+    Normal = 1,
+    High = 2,
+    Critical = 3,
 }
 
 impl CompletionRequest {
@@ -57,6 +127,10 @@ impl CompletionRequest {
             stop: None,
             stream: false,
             metadata: HashMap::new(),
+            priority: RequestPriority::Normal,
+            timeout: None,
+            compress_response: false,
+            batchable: false,
         }
     }
 
@@ -72,6 +146,31 @@ impl CompletionRequest {
 
     pub fn with_metadata(mut self, key: String, value: String) -> Self {
         self.metadata.insert(key, value);
+        self
+    }
+
+    pub fn with_priority(mut self, priority: RequestPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    pub fn with_compression(mut self, compress: bool) -> Self {
+        self.compress_response = compress;
+        self
+    }
+
+    pub fn with_batching(mut self, batchable: bool) -> Self {
+        self.batchable = batchable;
+        self
+    }
+
+    pub fn with_streaming(mut self, stream: bool) -> Self {
+        self.stream = stream;
         self
     }
 }
@@ -201,6 +300,12 @@ pub struct AtomicUsageStats {
     pub cost_today: RwLock<f64>,
 }
 
+impl Default for AtomicUsageStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AtomicUsageStats {
     pub fn new() -> Self {
         Self {
@@ -243,6 +348,7 @@ impl AtomicUsageStats {
 }
 
 /// Claude AI provider implementation
+#[derive(Clone)]
 pub struct ClaudeProvider {
     api_key: String,
     base_url: String,
@@ -386,6 +492,62 @@ impl AIProvider for ClaudeProvider {
     async fn get_usage_stats(&self) -> Result<UsageStats> {
         Ok(self.usage_stats.to_usage_stats().await)
     }
+
+    async fn stream(&self, request: &CompletionRequest) -> Result<Box<dyn StreamingResponse>> {
+        let _permit = self.rate_limiter.acquire().await?;
+        
+        let url = format!("{}/v1/messages", self.base_url);
+        let mut claude_request = self.convert_to_claude_format(request)?;
+        claude_request["stream"] = serde_json::Value::Bool(true);
+        
+        let response = self.client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .header("Anthropic-Version", "2023-06-01")
+            .json(&claude_request)
+            .send()
+            .await
+            .map_err(|e| WritemagicError::network(format!("Claude API request failed: {}", e)))?;
+
+        if response.status().is_success() {
+            Ok(Box::new(ClaudeStreamingResponse::new(response)))
+        } else {
+            let error_text = response.text().await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            Err(WritemagicError::ai_provider(format!("Claude streaming failed: {}", error_text)))
+        }
+    }
+
+    async fn batch_complete(&self, requests: Vec<CompletionRequest>) -> Result<Vec<Result<CompletionResponse>>> {
+        let mut results = Vec::new();
+        for request in requests {
+            let result = self.complete(&request).await;
+            results.push(result);
+        }
+        Ok(results)
+    }
+
+    async fn health_check(&self) -> Result<ProviderHealthMetrics> {
+        let start_time = Instant::now();
+        
+        let test_request = CompletionRequest::new(
+            vec![Message::user("Test")],
+            "claude-3-haiku-20240307".to_string(),
+        ).with_max_tokens(1);
+
+        let result = self.complete(&test_request).await;
+        let response_time_ms = start_time.elapsed().as_millis() as u64;
+        
+        Ok(ProviderHealthMetrics {
+            is_healthy: result.is_ok(),
+            response_time_ms,
+            success_rate: if result.is_ok() { 1.0 } else { 0.0 },
+            error_count: if result.is_ok() { 0 } else { 1 },
+            last_error: result.err().map(|e| e.to_string()),
+            timestamp: std::time::SystemTime::now(),
+        })
+    }
 }
 
 impl ClaudeProvider {
@@ -481,6 +643,7 @@ impl ClaudeProvider {
 }
 
 /// OpenAI GPT provider implementation
+#[derive(Clone)]
 pub struct OpenAIProvider {
     api_key: String,
     base_url: String,
@@ -618,6 +781,61 @@ impl AIProvider for OpenAIProvider {
     async fn get_usage_stats(&self) -> Result<UsageStats> {
         Ok(self.usage_stats.to_usage_stats().await)
     }
+
+    async fn stream(&self, request: &CompletionRequest) -> Result<Box<dyn StreamingResponse>> {
+        let _permit = self.rate_limiter.acquire().await?;
+        
+        let url = format!("{}/v1/chat/completions", self.base_url);
+        let mut openai_request = self.convert_to_openai_format(request);
+        openai_request["stream"] = serde_json::Value::Bool(true);
+        
+        let response = self.client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .json(&openai_request)
+            .send()
+            .await
+            .map_err(|e| WritemagicError::network(format!("OpenAI API request failed: {}", e)))?;
+
+        if response.status().is_success() {
+            Ok(Box::new(OpenAIStreamingResponse::new(response)))
+        } else {
+            let error_text = response.text().await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            Err(WritemagicError::ai_provider(format!("OpenAI streaming failed: {}", error_text)))
+        }
+    }
+
+    async fn batch_complete(&self, requests: Vec<CompletionRequest>) -> Result<Vec<Result<CompletionResponse>>> {
+        let mut results = Vec::new();
+        for request in requests {
+            let result = self.complete(&request).await;
+            results.push(result);
+        }
+        Ok(results)
+    }
+
+    async fn health_check(&self) -> Result<ProviderHealthMetrics> {
+        let start_time = Instant::now();
+        
+        let test_request = CompletionRequest::new(
+            vec![Message::user("Test")],
+            "gpt-3.5-turbo".to_string(),
+        ).with_max_tokens(1);
+
+        let result = self.complete(&test_request).await;
+        let response_time_ms = start_time.elapsed().as_millis() as u64;
+        
+        Ok(ProviderHealthMetrics {
+            is_healthy: result.is_ok(),
+            response_time_ms,
+            success_rate: if result.is_ok() { 1.0 } else { 0.0 },
+            error_count: if result.is_ok() { 0 } else { 1 },
+            last_error: result.err().map(|e| e.to_string()),
+            timestamp: std::time::SystemTime::now(),
+        })
+    }
 }
 
 impl OpenAIProvider {
@@ -664,12 +882,12 @@ impl RateLimiter {
         }
     }
 
-    pub async fn acquire(&self) -> Result<tokio::sync::SemaphorePermit<'_>, WritemagicError> {
+    pub async fn acquire(&self) -> writemagic_shared::Result<tokio::sync::SemaphorePermit<'_>> {
         let permit = self.semaphore.acquire().await
             .map_err(|_| WritemagicError::network("Rate limiter semaphore closed".to_string()))?;
         
         // Enforce minimum interval between requests
-        let mut last = self.last_request.write().await;
+        let last = self.last_request.write().await;
         let elapsed = last.elapsed();
         if elapsed < self.min_interval {
             let sleep_duration = self.min_interval - elapsed;
@@ -754,11 +972,225 @@ impl ResponseCache {
             key_parts.push(format!("{}:{}", role_str, message.content));
         }
         
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        
         let mut hasher = DefaultHasher::new();
         key_parts.join("|").hash(&mut hasher);
         format!("{:x}", hasher.finish())
+    }
+}
+
+/// Claude streaming response implementation
+pub struct ClaudeStreamingResponse {
+    response: reqwest::Response,
+    buffer: String,
+    is_complete: bool,
+    accumulated_content: String,
+}
+
+impl ClaudeStreamingResponse {
+    pub fn new(response: reqwest::Response) -> Self {
+        Self {
+            response,
+            buffer: String::new(),
+            is_complete: false,
+            accumulated_content: String::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl StreamingResponse for ClaudeStreamingResponse {
+    async fn next_chunk(&mut self) -> Result<Option<StreamingChunk>> {
+        if self.is_complete {
+            return Ok(None);
+        }
+
+        // Read next bytes from response
+        let chunk = match self.response.chunk().await {
+            Ok(Some(chunk)) => {
+                self.buffer.push_str(&String::from_utf8_lossy(&chunk));
+                chunk
+            }
+            Ok(None) => {
+                self.is_complete = true;
+                return Ok(None);
+            }
+            Err(e) => {
+                self.is_complete = true;
+                return Err(WritemagicError::network(format!("Streaming error: {}", e)));
+            }
+        };
+
+        if chunk.is_empty() {
+            self.is_complete = true;
+            return Ok(None);
+        }
+
+        // Parse Server-Sent Events format
+        if let Some(event_end) = self.buffer.find("\n\n") {
+            let event_data = self.buffer[..event_end].to_string();
+            self.buffer.drain(..event_end + 2);
+
+            // Parse the event data
+            for line in event_data.lines() {
+                if line.starts_with("data: ") {
+                    let json_data = &line[6..];
+                    if json_data == "[DONE]" {
+                        self.is_complete = true;
+                        return Ok(None);
+                    }
+
+                    match serde_json::from_str::<serde_json::Value>(json_data) {
+                        Ok(parsed) => {
+                            if let Some(content) = parsed["delta"]["text"].as_str() {
+                                self.accumulated_content.push_str(content);
+                                
+                                return Ok(Some(StreamingChunk {
+                                    content: content.to_string(),
+                                    finish_reason: parsed["delta"]["stop_reason"].as_str()
+                                        .and_then(|r| match r {
+                                            "end_turn" => Some(FinishReason::Stop),
+                                            "max_tokens" => Some(FinishReason::Length),
+                                            _ => None,
+                                        }),
+                                    usage: None, // Usage typically comes at the end
+                                }));
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to parse streaming JSON: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+
+        // If no complete event found, continue reading
+        Ok(None)
+    }
+
+    fn is_complete(&self) -> bool {
+        self.is_complete
+    }
+
+    fn get_partial_response(&self) -> String {
+        self.accumulated_content.clone()
+    }
+}
+
+/// OpenAI streaming response implementation
+pub struct OpenAIStreamingResponse {
+    response: reqwest::Response,
+    buffer: String,
+    is_complete: bool,
+    accumulated_content: String,
+}
+
+impl OpenAIStreamingResponse {
+    pub fn new(response: reqwest::Response) -> Self {
+        Self {
+            response,
+            buffer: String::new(),
+            is_complete: false,
+            accumulated_content: String::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl StreamingResponse for OpenAIStreamingResponse {
+    async fn next_chunk(&mut self) -> Result<Option<StreamingChunk>> {
+        if self.is_complete {
+            return Ok(None);
+        }
+
+        // Read next bytes from response
+        let chunk = match self.response.chunk().await {
+            Ok(Some(chunk)) => {
+                self.buffer.push_str(&String::from_utf8_lossy(&chunk));
+                chunk
+            }
+            Ok(None) => {
+                self.is_complete = true;
+                return Ok(None);
+            }
+            Err(e) => {
+                self.is_complete = true;
+                return Err(WritemagicError::network(format!("Streaming error: {}", e)));
+            }
+        };
+
+        if chunk.is_empty() {
+            self.is_complete = true;
+            return Ok(None);
+        }
+
+        // Parse Server-Sent Events format
+        if let Some(event_end) = self.buffer.find("\n\n") {
+            let event_data = self.buffer[..event_end].to_string();
+            self.buffer.drain(..event_end + 2);
+
+            // Parse the event data
+            for line in event_data.lines() {
+                if line.starts_with("data: ") {
+                    let json_data = &line[6..];
+                    if json_data == "[DONE]" {
+                        self.is_complete = true;
+                        return Ok(None);
+                    }
+
+                    match serde_json::from_str::<serde_json::Value>(json_data) {
+                        Ok(parsed) => {
+                            if let Some(choices) = parsed["choices"].as_array() {
+                                if let Some(choice) = choices.first() {
+                                    if let Some(content) = choice["delta"]["content"].as_str() {
+                                        self.accumulated_content.push_str(content);
+                                        
+                                        return Ok(Some(StreamingChunk {
+                                            content: content.to_string(),
+                                            finish_reason: choice["finish_reason"].as_str()
+                                                .and_then(|r| match r {
+                                                    "stop" => Some(FinishReason::Stop),
+                                                    "length" => Some(FinishReason::Length),
+                                                    "content_filter" => Some(FinishReason::ContentFilter),
+                                                    "tool_calls" => Some(FinishReason::ToolCalls),
+                                                    "function_call" => Some(FinishReason::FunctionCall),
+                                                    _ => None,
+                                                }),
+                                            usage: parsed["usage"].as_object().map(|usage| {
+                                                Usage {
+                                                    prompt_tokens: usage.get("prompt_tokens")
+                                                        .and_then(|v| v.as_u64())
+                                                        .unwrap_or(0) as u32,
+                                                    completion_tokens: usage.get("completion_tokens")
+                                                        .and_then(|v| v.as_u64())
+                                                        .unwrap_or(0) as u32,
+                                                    total_tokens: usage.get("total_tokens")
+                                                        .and_then(|v| v.as_u64())
+                                                        .unwrap_or(0) as u32,
+                                                }
+                                            }),
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to parse OpenAI streaming JSON: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+
+        // If no complete event found, continue reading
+        Ok(None)
+    }
+
+    fn is_complete(&self) -> bool {
+        self.is_complete
+    }
+
+    fn get_partial_response(&self) -> String {
+        self.accumulated_content.clone()
     }
 }

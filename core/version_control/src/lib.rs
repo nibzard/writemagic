@@ -1,14 +1,8 @@
 //! Version control domain - Git integration with timeline visualization
 
 pub mod entities;
-pub mod value_objects;
-pub mod services;
-pub mod repositories;
 
 pub use entities::*;
-pub use value_objects::*;
-pub use services::*;
-pub use repositories::*;
 
 /// Git repository abstraction
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

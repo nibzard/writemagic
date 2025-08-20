@@ -6,11 +6,11 @@ pub mod aggregates;
 pub mod services;
 pub mod repositories;
 
-pub use entities::*;
-pub use value_objects::*;
-pub use aggregates::*;
-pub use services::*;
-pub use repositories::*;
+pub use entities::{Project, WorkspaceConfig, ProjectMetadata, ProjectTemplate, PaneConfig, PaneType};
+pub use value_objects::{ProjectStatus, ProjectPriority, ProjectColor, ProjectTag, ProjectGoal, GoalType};
+pub use aggregates::{ProjectAggregate, ProjectEvent};
+pub use services::{ProjectManagementService, ProjectTemplateService, ProjectAnalyticsService, CreateProjectRequest, UpdateProjectRequest, ProjectAnalytics, ProductivityMetrics};
+pub use repositories::{ProjectRepository, ProjectTemplateRepository, ProjectFilter, ProjectSearchCriteria, ProjectSortBy, SortOrder, RecentActivity, ActivityType};
 
 /// Workspace entity for managing multiple panes
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

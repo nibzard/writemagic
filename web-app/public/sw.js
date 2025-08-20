@@ -67,7 +67,6 @@ const WASM_CACHE_URLS = [
   '/src/js/writing-session.js',
   '/src/js/utils/event-emitter.js',
   '/src/js/utils/debounce.js',
-  '/src/js/ai-proxy-integration.js',
   '/src/js/utils/wasm-loader.js',
   '/src/js/utils/progressive-loader.js', 
   '/src/js/utils/performance-monitor.js',
@@ -1027,7 +1026,6 @@ function isWasmResource(url) {
 
 function isAIRequest(url) {
   return url.pathname.startsWith('/api/ai/') ||
-         url.pathname.startsWith('/ai-proxy/') ||
          url.pathname.includes('completion') ||
          url.pathname.includes('chat');
 }

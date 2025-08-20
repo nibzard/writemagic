@@ -1,31 +1,36 @@
 # .cargo/config.toml
 [build]
-# Use mold linker for much faster linking (100x faster than ld)
-# Install with: sudo apt install mold (Ubuntu) or brew install mold (macOS)
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+# Removed mold linker configuration to prevent linker errors
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
 [target.x86_64-unknown-linux-gnu]
-linker = "clang"
 rustflags = [
-    "-C", "link-arg=-fuse-ld=mold",
     "-C", "target-cpu=native",     # Optimize for current CPU
-    "-Z", "share-generics=y",      # Share monomorphized generics (requires nightly)
 ]
 
 [target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+crt-static"]  # Static CRT linking
 
 [target.aarch64-linux-android]
-linker = "aarch64-linux-android-clang"
+linker = "/home/niko/Android/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
 
 [target.armv7-linux-androideabi]
-linker = "armv7a-linux-androideabi-clang"
+linker = "/home/niko/Android/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi24-clang"
 
 [target.i686-linux-android]
-linker = "i686-linux-android-clang"
+linker = "/home/niko/Android/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android24-clang"
 
 [target.x86_64-linux-android]
-linker = "x86_64-linux-android-clang"
+linker = "/home/niko/Android/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android24-clang"
+
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals"
+]
+
+# Enable WASM features for getrandom
+[env]
+CARGO_CFG_TARGET_ARCH = "wasm32"
 
 [net]
 git-fetch-with-cli = true    # Use system git for better SSH key support

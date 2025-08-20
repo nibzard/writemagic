@@ -44,7 +44,7 @@ futures = "0.3"
 
 # Tokenization
 tiktoken-rs = "0.5"
-ahash = "0.8"
+ahash = { workspace = true }
 
 # Security and crypto
 zeroize = "1.7"
@@ -53,5 +53,5 @@ blake3 = "1.5"
 
 # Performance and monitoring
 metrics = "0.21"
-tracing-metrics = "0.2"
+# tracing-metrics = "0.3"
 parking_lot = "0.12"

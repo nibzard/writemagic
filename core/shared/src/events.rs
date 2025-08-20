@@ -3,13 +3,14 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{RwLock, mpsc};
-use crate::{EntityId, Result, WritemagicError};
+use tokio::sync::RwLock;
+use crate::{EntityId, Result};
 
 /// Base trait for all domain events
-pub trait DomainEvent: Send + Sync + std::fmt::Debug {
+pub trait DomainEvent: Send + Sync + std::fmt::Debug + Any {
     /// Unique identifier for this event
     fn event_id(&self) -> EntityId;
     
@@ -29,6 +30,9 @@ pub trait DomainEvent: Send + Sync + std::fmt::Debug {
     fn metadata(&self) -> HashMap<String, String> {
         HashMap::new()
     }
+    
+    /// Get as Any for downcasting
+    fn as_any(&self) -> &dyn Any;
 }
 
 /// Event handler trait
@@ -37,17 +41,20 @@ pub trait EventHandler<T: DomainEvent>: Send + Sync {
     async fn handle(&self, event: &T) -> Result<()>;
 }
 
+/// Type-erased event handler
+type DynEventHandler = Arc<dyn Fn(&dyn DomainEvent) -> Result<()> + Send + Sync>;
+
 /// Event bus for publishing and subscribing to events
 #[async_trait]
 pub trait EventBus: Send + Sync {
     /// Publish an event to all subscribers
-    async fn publish<T: DomainEvent>(&self, event: T) -> Result<()>;
+    async fn publish(&self, event: Box<dyn DomainEvent>) -> Result<()>;
     
-    /// Subscribe a handler to events of type T
-    async fn subscribe<T: DomainEvent + 'static>(&self, handler: Arc<dyn EventHandler<T>>) -> Result<()>;
+    /// Subscribe a handler to events of a specific type
+    async fn subscribe(&self, event_type: TypeId, handler: DynEventHandler) -> Result<()>;
     
-    /// Unsubscribe from events
-    async fn unsubscribe<T: DomainEvent + 'static>(&self) -> Result<()>;
+    /// Unsubscribe from events of a specific type
+    async fn unsubscribe(&self, event_type: TypeId) -> Result<()>;
 }
 
 /// Event store for persisting events
@@ -113,27 +120,7 @@ pub trait EventSourcedAggregate: Send + Sync {
 
 /// In-memory event bus implementation
 pub struct InMemoryEventBus {
-    handlers: Arc<RwLock<HashMap<String, Vec<Arc<dyn EventHandlerWrapper>>>>>,
-}
-
-/// Wrapper trait to handle type erasure for event handlers
-#[async_trait]
-trait EventHandlerWrapper: Send + Sync {
-    async fn handle_event(&self, event: &dyn DomainEvent) -> Result<()>;
-}
-
-/// Concrete wrapper implementation
-struct EventHandlerWrapperImpl<T: DomainEvent> {
-    handler: Arc<dyn EventHandler<T>>,
-}
-
-#[async_trait]
-impl<T: DomainEvent + 'static> EventHandlerWrapper for EventHandlerWrapperImpl<T> {
-    async fn handle_event(&self, event: &dyn DomainEvent) -> Result<()> {
-        // This is a simplified implementation. In practice, you'd need proper type checking.
-        // For now, we'll skip the actual handling since we can't safely downcast here.
-        Ok(())
-    }
+    handlers: Arc<RwLock<HashMap<TypeId, Vec<DynEventHandler>>>>,
 }
 
 impl InMemoryEventBus {
@@ -142,6 +129,26 @@ impl InMemoryEventBus {
         Self {
             handlers: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+    
+    /// Type-safe helper for publishing events
+    pub async fn publish_typed<T: DomainEvent + 'static>(&self, event: T) -> Result<()> {
+        self.publish(Box::new(event)).await
+    }
+    
+    /// Type-safe helper for subscribing to events
+    pub async fn subscribe_typed<T: DomainEvent + 'static, F>(&self, handler: F) -> Result<()>
+    where
+        F: Fn(&T) -> Result<()> + Send + Sync + 'static,
+    {
+        let handler = Arc::new(move |event: &dyn DomainEvent| {
+            if let Some(typed_event) = event.as_any().downcast_ref::<T>() {
+                handler(typed_event)
+            } else {
+                Ok(())
+            }
+        });
+        self.subscribe(TypeId::of::<T>(), handler).await
     }
 }
 
@@ -153,15 +160,15 @@ impl Default for InMemoryEventBus {
 
 #[async_trait]
 impl EventBus for InMemoryEventBus {
-    async fn publish<T: DomainEvent>(&self, event: T) -> Result<()> {
-        let event_type = event.event_type();
+    async fn publish(&self, event: Box<dyn DomainEvent>) -> Result<()> {
+        let event_type_id = event.as_any().type_id();
         let handlers = self.handlers.read().await;
         
-        if let Some(event_handlers) = handlers.get(event_type) {
+        if let Some(event_handlers) = handlers.get(&event_type_id) {
             for handler in event_handlers {
-                if let Err(e) = handler.handle_event(&event).await {
+                if let Err(e) = handler(event.as_ref()) {
                     // Log error but continue with other handlers
-                    tracing::error!("Error handling event {}: {}", event_type, e);
+                    tracing::error!("Error handling event {}: {}", event.event_type(), e);
                 }
             }
         }
@@ -169,18 +176,13 @@ impl EventBus for InMemoryEventBus {
         Ok(())
     }
     
-    async fn subscribe<T: DomainEvent + 'static>(&self, handler: Arc<dyn EventHandler<T>>) -> Result<()> {
-        let event_type = std::any::type_name::<T>().to_string();
+    async fn subscribe(&self, event_type: TypeId, handler: DynEventHandler) -> Result<()> {
         let mut handlers = self.handlers.write().await;
-        
-        let wrapper = Arc::new(EventHandlerWrapperImpl { handler });
-        handlers.entry(event_type).or_insert_with(Vec::new).push(wrapper);
-        
+        handlers.entry(event_type).or_insert_with(Vec::new).push(handler);
         Ok(())
     }
     
-    async fn unsubscribe<T: DomainEvent + 'static>(&self) -> Result<()> {
-        let event_type = std::any::type_name::<T>().to_string();
+    async fn unsubscribe(&self, event_type: TypeId) -> Result<()> {
         let mut handlers = self.handlers.write().await;
         handlers.remove(&event_type);
         Ok(())
@@ -267,6 +269,10 @@ pub enum CrossDomainEvent {
 }
 
 impl DomainEvent for CrossDomainEvent {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    
     fn event_id(&self) -> EntityId {
         match self {
             CrossDomainEvent::DocumentCreated { base, .. } => base.event_id,
@@ -367,12 +373,12 @@ pub trait EventPublisher: Send + Sync {
 
 /// Implementation of event publisher using the event bus
 pub struct EventBusPublisher {
-    event_bus: Arc<dyn EventBus>,
+    event_bus: Arc<InMemoryEventBus>, // Use concrete type for now
 }
 
 impl EventBusPublisher {
     /// Create a new event publisher
-    pub fn new(event_bus: Arc<dyn EventBus>) -> Self {
+    pub fn new(event_bus: Arc<InMemoryEventBus>) -> Self {
         Self { event_bus }
     }
 }
@@ -380,7 +386,7 @@ impl EventBusPublisher {
 #[async_trait]
 impl EventPublisher for EventBusPublisher {
     async fn publish_event(&self, event: CrossDomainEvent) -> Result<()> {
-        self.event_bus.publish(event).await
+        self.event_bus.publish(Box::new(event)).await
     }
 }
 
@@ -403,7 +409,7 @@ mod tests {
         };
         
         // Publish the event (should not fail even with no subscribers)
-        let result = event_bus.publish(event).await;
+        let result = event_bus.publish(Box::new(event)).await;
         assert!(result.is_ok());
     }
     

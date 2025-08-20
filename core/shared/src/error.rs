@@ -3,7 +3,6 @@
 use thiserror::Error;
 use serde::Serialize;
 use std::backtrace::Backtrace;
-use std::fmt;
 
 /// Structured error response for APIs
 #[derive(Debug, Serialize, Clone)]
@@ -17,7 +16,7 @@ pub struct ErrorResponse {
 }
 
 /// Standard error codes for API responses
-#[derive(Debug, Serialize, Clone, Copy)]
+#[derive(Debug, Serialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrorCode {
     InvalidRequest,
@@ -88,6 +87,9 @@ pub enum WritemagicError {
     #[error("Network error: {message}")]
     Network { message: String },
 
+    #[error("Security error: {message}")]
+    Security { message: String },
+
     #[error("Internal error: {message}")]
     Internal { 
         message: String,
@@ -110,6 +112,9 @@ pub enum WritemagicError {
 
     #[error("Version conflict: {message}")]
     VersionConflict { message: String },
+
+    #[error("Feature not implemented: {message}")]
+    NotImplemented { message: String },
 }
 
 /// Result type alias for WriteMagic operations
@@ -164,6 +169,12 @@ impl WritemagicError {
         }
     }
 
+    pub fn security(message: impl Into<String>) -> Self {
+        Self::Security {
+            message: message.into(),
+        }
+    }
+
     pub fn internal(message: impl Into<String>) -> Self {
         Self::Internal {
             message: message.into(),
@@ -207,6 +218,12 @@ impl WritemagicError {
         }
     }
 
+    pub fn not_implemented(message: impl Into<String>) -> Self {
+        Self::NotImplemented {
+            message: message.into(),
+        }
+    }
+
     /// Get error message for debugging and testing
     pub fn message(&self) -> String {
         match self {
@@ -218,9 +235,11 @@ impl WritemagicError {
             Self::Authentication { message } => message.clone(),
             Self::Configuration { message } => message.clone(),
             Self::Network { message } => message.clone(),
+            Self::Security { message } => message.clone(),
             Self::Internal { message, .. } => message.clone(),
             Self::NotFound { resource } => resource.clone(),
             Self::VersionConflict { message } => message.clone(),
+            Self::NotImplemented { message } => message.clone(),
             Self::Io { source } => source.to_string(),
             Self::Serialization { source } => source.to_string(),
             Self::Timeout { timeout_ms } => format!("Request timeout after {}ms", timeout_ms),
@@ -236,6 +255,7 @@ impl WritemagicError {
         let (code, details) = match self {
             Self::Validation { .. } => (ErrorCode::ValidationFailed, None),
             Self::Authentication { .. } => (ErrorCode::Unauthorized, None),
+            Self::Security { .. } => (ErrorCode::Forbidden, None),
             Self::NotFound { resource } => (
                 ErrorCode::NotFound, 
                 Some(serde_json::json!({ "resource": resource }))
@@ -252,6 +272,7 @@ impl WritemagicError {
                 None
             ),
             Self::VersionConflict { .. } => (ErrorCode::Conflict, None),
+            Self::NotImplemented { .. } => (ErrorCode::ServiceUnavailable, None),
             _ => (ErrorCode::InternalError, None),
         };
 

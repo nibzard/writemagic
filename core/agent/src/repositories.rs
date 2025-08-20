@@ -1,13 +1,13 @@
 //! Agent domain repositories
 
-use writemagic_shared::{EntityId, WritemagicError, Result};
-use crate::aggregates::{AgentAggregate, QueuedExecution, ExecutionRecord};
+use writemagic_shared::{EntityId, Result, WritemagicError};
+use crate::aggregates::{AgentAggregate, ExecutionRecord};
 use crate::entities::{Agent, AgentWorkflow};
-use crate::value_objects::{ExecutionPriority, AgentVersion, WorkflowValidation};
+use crate::value_objects::ExecutionPriority;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use serde_json::Value;
-use std::collections::{BTreeMap, HashMap};
+// Remove unused serde_json import
+use std::collections::HashMap;
 
 /// Repository for persisting and retrieving agent aggregates
 #[async_trait]
@@ -141,6 +141,12 @@ pub struct SqliteAgentRepository {
     // Connection pool would be injected here
 }
 
+impl Default for SqliteAgentRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SqliteAgentRepository {
     pub fn new() -> Self {
         Self {}
@@ -150,62 +156,60 @@ impl SqliteAgentRepository {
 #[async_trait]
 impl AgentRepository for SqliteAgentRepository {
     async fn save(&self, aggregate: &mut AgentAggregate) -> Result<()> {
-        // Save agent aggregate to SQLite
-        // This would include:
-        // 1. Save agent entity
-        // 2. Save current execution queue
-        // 3. Save execution history (limited)
-        // 4. Save resource usage stats
-        // 5. Process and save domain events
-        
-        // Clear events after successful persistence
+        // Clear events to simulate successful save
         aggregate.clear_events();
         
-        Ok(())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
-    async fn load(&self, agent_id: &EntityId) -> Result<Option<AgentAggregate>> {
-        // Load agent aggregate from SQLite
-        // This would reconstruct:
-        // 1. Agent entity with current state
-        // 2. Execution queue from database
-        // 3. Recent execution history
-        // 4. Resource usage statistics
-        // 5. Aggregate version for optimistic concurrency
-        
-        // For now, return None (not found)
-        Ok(None)
+    async fn load(&self, _agent_id: &EntityId) -> Result<Option<AgentAggregate>> {
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn delete(&self, _agent_id: &EntityId) -> Result<()> {
-        // Soft delete agent and clean up related data
-        Ok(())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn find_by_criteria(&self, _criteria: AgentSearchCriteria) -> Result<Vec<Agent>> {
-        // Complex query with filtering, sorting, and pagination
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn list_active(&self) -> Result<Vec<Agent>> {
-        // Query for all active agents
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn count_by_status(&self) -> Result<HashMap<String, u64>> {
-        // Aggregate query for status counts
-        Ok(HashMap::new())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn find_by_workflow_version(&self, _version: &str) -> Result<Vec<Agent>> {
-        // Find agents using specific workflow version
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
 }
 
 /// IndexedDB implementation for web platform
 pub struct IndexedDbAgentRepository {
     // Web-specific connection would be here
+}
+
+impl Default for IndexedDbAgentRepository {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IndexedDbAgentRepository {
@@ -217,109 +221,150 @@ impl IndexedDbAgentRepository {
 #[async_trait]
 impl AgentRepository for IndexedDbAgentRepository {
     async fn save(&self, aggregate: &mut AgentAggregate) -> Result<()> {
-        // Save to IndexedDB for web platform
-        // Similar logic but adapted for browser storage
+        // Clear events to simulate successful save
         aggregate.clear_events();
-        Ok(())
+        
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn load(&self, _agent_id: &EntityId) -> Result<Option<AgentAggregate>> {
-        // Load from IndexedDB
-        Ok(None)
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn delete(&self, _agent_id: &EntityId) -> Result<()> {
-        // Delete from IndexedDB
-        Ok(())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn find_by_criteria(&self, _criteria: AgentSearchCriteria) -> Result<Vec<Agent>> {
-        // IndexedDB query with manual filtering
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn list_active(&self) -> Result<Vec<Agent>> {
-        // Query active agents from IndexedDB
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn count_by_status(&self) -> Result<HashMap<String, u64>> {
-        // Count by status in IndexedDB
-        Ok(HashMap::new())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn find_by_workflow_version(&self, _version: &str) -> Result<Vec<Agent>> {
-        // Find by workflow version in IndexedDB
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
 }
 
 /// SQLite implementation of AgentWorkflowRepository
-pub struct SqliteAgentWorkflowRepository {}
+/// Note: Agent domain is out of MVP scope but retained for future development
+pub struct SqliteAgentWorkflowRepository {
+    // TODO: Add actual SQLite connection pool when implementing persistence
+    _phantom: std::marker::PhantomData<()>,
+}
+
+impl Default for SqliteAgentWorkflowRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl SqliteAgentWorkflowRepository {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            _phantom: std::marker::PhantomData,
+        }
     }
 }
 
 #[async_trait]
 impl AgentWorkflowRepository for SqliteAgentWorkflowRepository {
     async fn save_workflow(&self, _workflow: &AgentWorkflow) -> Result<()> {
-        // Save workflow to SQLite with version control
-        Ok(())
+        Err(WritemagicError::not_implemented(
+            "Agent workflow repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn load_workflow(&self, _name: &str, _version: &str) -> Result<Option<AgentWorkflow>> {
-        // Load specific workflow version
-        Ok(None)
+        Err(WritemagicError::not_implemented(
+            "Agent workflow repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn list_workflow_versions(&self, _name: &str) -> Result<Vec<AgentWorkflow>> {
-        // List all versions of a workflow
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent workflow repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn find_workflows(&self, _criteria: WorkflowSearchCriteria) -> Result<Vec<AgentWorkflow>> {
-        // Search workflows by criteria
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent workflow repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn delete_workflow(&self, _name: &str, _version: &str) -> Result<()> {
-        // Delete specific workflow version
-        Ok(())
+        Err(WritemagicError::not_implemented(
+            "Agent workflow repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn get_latest_version(&self, _name: &str) -> Result<Option<AgentWorkflow>> {
-        // Get the latest version of a workflow
-        Ok(None)
+        Err(WritemagicError::not_implemented(
+            "Agent workflow repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
 }
 
 /// SQLite implementation of ExecutionRepository
-pub struct SqliteExecutionRepository {}
+/// Note: Agent domain is out of MVP scope but retained for future development
+pub struct SqliteExecutionRepository {
+    // TODO: Add actual SQLite connection pool when implementing persistence
+    _phantom: std::marker::PhantomData<()>,
+}
+
+impl Default for SqliteExecutionRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl SqliteExecutionRepository {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            _phantom: std::marker::PhantomData,
+        }
     }
 }
 
 #[async_trait]
 impl ExecutionRepository for SqliteExecutionRepository {
     async fn save_execution(&self, _record: &ExecutionRecord) -> Result<()> {
-        // Save execution record to SQLite
-        Ok(())
+        Err(WritemagicError::not_implemented(
+            "Agent execution repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn load_execution(&self, _execution_id: &EntityId) -> Result<Option<ExecutionRecord>> {
-        // Load execution record by ID
-        Ok(None)
+        Err(WritemagicError::not_implemented(
+            "Agent execution repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn find_by_agent(&self, _agent_id: &EntityId, _limit: Option<u64>) -> Result<Vec<ExecutionRecord>> {
-        // Find executions for specific agent
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent execution repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn find_by_date_range(
@@ -328,40 +373,27 @@ impl ExecutionRepository for SqliteExecutionRepository {
         _end_date: DateTime<Utc>,
         _limit: Option<u64>,
     ) -> Result<Vec<ExecutionRecord>> {
-        // Find executions in date range
-        Ok(Vec::new())
+        Err(WritemagicError::not_implemented(
+            "Agent execution repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn get_execution_stats(&self, _agent_id: &EntityId) -> Result<ExecutionStatistics> {
-        // Calculate execution statistics
-        Ok(ExecutionStatistics {
-            total_executions: 0,
-            successful_executions: 0,
-            failed_executions: 0,
-            cancelled_executions: 0,
-            average_duration_ms: 0,
-            total_cpu_time_ms: 0,
-            total_memory_used_mb: 0,
-            last_execution_at: None,
-            success_rate: 0.0,
-            failure_rate: 0.0,
-        })
+        Err(WritemagicError::not_implemented(
+            "Agent execution repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn cleanup_old_executions(&self, _cutoff_date: DateTime<Utc>) -> Result<u64> {
-        // Clean up old execution records
-        Ok(0)
+        Err(WritemagicError::not_implemented(
+            "Agent execution repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
     
     async fn get_queue_status(&self, _agent_id: &EntityId) -> Result<QueueStatus> {
-        // Get current queue status
-        Ok(QueueStatus {
-            pending_executions: 0,
-            running_executions: 0,
-            oldest_pending: None,
-            estimated_wait_time: None,
-            priority_breakdown: HashMap::new(),
-        })
+        Err(WritemagicError::not_implemented(
+            "Agent execution repository not implemented - Agent domain is out of MVP scope"
+        ))
     }
 }
 

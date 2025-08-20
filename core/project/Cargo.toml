@@ -7,11 +7,15 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = ["database"]
+database = []
+wasm = []
+
 [dependencies]
 writemagic-shared = { path = "../shared" }
-writemagic-writing = { path = "../writing" }
+writemagic-writing = { path = "../writing", default-features = false }
 async-trait.workspace = true
-tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
@@ -21,3 +25,10 @@ chrono.workspace = true
 validator.workspace = true
 log.workspace = true
 tracing.workspace = true
+
+# Target-specific dependencies
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { version = "1.44", default-features = false, features = ["rt", "macros", "time", "sync"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true }

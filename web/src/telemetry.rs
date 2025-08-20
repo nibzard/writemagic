@@ -110,7 +110,7 @@ fn extract_client_ip(headers: &axum::http::HeaderMap) -> String {
     ];
 
     for header_name in &ip_headers {
-        if let Some(header_value) = headers.get(header_name) {
+        if let Some(header_value) = headers.get(*header_name) {
             if let Ok(header_str) = header_value.to_str() {
                 let ip = header_str.split(',').next().unwrap_or("").trim();
                 if !ip.is_empty() {
@@ -167,7 +167,7 @@ impl MetricsCollector {
         
         let mut request_counts = std::collections::HashMap::new();
         let mut response_times = std::collections::HashMap::new();
-        let mut active_connections = 0;
+        let active_connections = 0;
         
         // Collect metrics from cache
         for entry in cache.iter() {
@@ -327,7 +327,6 @@ pub mod performance {
         }};
     }
     
-    pub use time_operation;
 }
 
 #[cfg(test)]

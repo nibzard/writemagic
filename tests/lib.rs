@@ -1,8 +1,23 @@
-//! WriteMagic Comprehensive Validation Test Suite
+//! WriteMagic Comprehensive Test Suite
 //! 
-//! This module provides complete end-to-end validation for WriteMagic,
-//! testing all components from mobile FFI to AI integration.
+//! This module provides complete end-to-end testing for WriteMagic,
+//! including edge cases, property-based testing, performance benchmarks,
+//! and comprehensive validation across all platforms.
 
+// Core test modules
+pub mod integration;
+pub mod performance;
+pub mod config;
+pub mod utils;
+pub mod mocks;
+pub mod reporting;
+
+// Advanced testing modules
+pub mod coverage_analysis;
+pub mod property_based_testing;
+pub mod orchestration;
+
+// Re-export validation modules for backward compatibility
 pub mod integration_validation;
 pub mod mobile_ffi_validation;
 pub mod performance_validation;

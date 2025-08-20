@@ -69,7 +69,7 @@ impl ShutdownCoordinator {
         self.cancellation_token.cancel();
         
         let start = std::time::Instant::now();
-        let mut services_remaining = 0;
+        let mut services_remaining: usize = 0;
         
         // Wait for services to complete or timeout
         while start.elapsed() < timeout {
@@ -167,7 +167,7 @@ pub trait GracefulShutdown {
         Self: Sized + Send,
     {
         let service_name = self.service_name().to_string();
-        let start_time = std::time::Instant::now();
+        let _start_time = std::time::Instant::now();
         
         info!("Starting service: {}", service_name);
         

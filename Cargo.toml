@@ -12,19 +12,20 @@ members = [
     "web",
     "core/wasm",
     "migration",
+    "tests",
 ]
 
 [workspace.package]
 version = "0.1.0"
-edition = "2024"
-rust-version = "1.84"
+edition = "2021"
+rust-version = "1.70"
 authors = ["WriteMagic Team"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/writemagic/writemagic"
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1.44", features = ["full"] }
+tokio = { version = "1.44", default-features = false, features = ["rt-multi-thread", "macros", "time", "sync", "fs", "process", "signal"] }
 tokio-util = { version = "0.7", features = ["full"] }
 async-trait = "0.1"
 
@@ -87,7 +88,7 @@ proptest = "1.5"
 testcontainers = "0.15"
 testcontainers-modules = { version = "0.3", features = ["postgres"] }
 axum-test = "14.0"
-tempfile = "3.8"
+tempfile = "=3.8.1"
 
 # Advanced performance
 memmap2 = "0.9"
@@ -137,6 +138,7 @@ libc = "0.2"
 # WASM specific
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+serde-wasm-bindgen = "0.6"
 js-sys = "0.3"
 web-sys = { version = "0.3", features = [
     "console",
@@ -156,7 +158,11 @@ web-sys = { version = "0.3", features = [
     "FileReader",
 ] }
 console_error_panic_hook = "0.1"
-getrandom = { version = "0.2", features = ["js"] }
+getrandom = { version = "=0.2.16", features = ["js"] }
+
+# Force specific dependency versions to ensure getrandom compatibility
+ahash = { version = "=0.8.7" }  # Last version that uses getrandom 0.2
+
 
 # Use workspace.lints for consistent linting across all crates
 [workspace.lints.rust]
@@ -176,12 +182,6 @@ must_use_candidate = "allow"
 too_many_lines = "allow"
 missing_errors_doc = "allow"
 
-[features]
-default = []
-jemalloc = ["tikv-jemallocator", "tikv-jemalloc-ctl"]
-file-logging = ["tracing-appender"]
-opentelemetry = ["tracing-opentelemetry"]
-portable_simd = []
 
 [profile.release]
 lto = true

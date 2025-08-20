@@ -1,6 +1,6 @@
 //! Version control domain entities
 
-use writemagic_shared::{EntityId, WritemagicError, Result};
+use writemagic_shared::EntityId;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -9,15 +9,23 @@ use garde::Validate;
 /// A commit in the version control system
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct Commit {
+    #[garde(skip)]
     pub id: EntityId,
+    #[garde(skip)]
     pub document_id: EntityId,
+    #[garde(skip)]
     pub parent_id: Option<EntityId>,
     #[garde(length(min = 1, max = 500))]
     pub message: String,
+    #[garde(skip)]
     pub author: EntityId,
+    #[garde(skip)]
     pub timestamp: DateTime<Utc>,
+    #[garde(skip)]
     pub content_hash: String,
+    #[garde(skip)]
     pub changes: Vec<Change>,
+    #[garde(skip)]
     pub metadata: CommitMetadata,
 }
 

@@ -10,7 +10,6 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::{DefaultMakeSpan, DefaultOnResponse, DefaultOnRequest, TraceLayer},
 };
-use tower::ServiceBuilder;
 use tracing::Level;
 
 use crate::{
@@ -47,25 +46,17 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api", api::router())
         .merge(websocket::handler::websocket_routes())
         // Add more route modules here as they are implemented
+        // Apply middleware layers in the correct order
+        .layer(cors)
+        .layer(RequestBodyLimitLayer::new(state.config.server.body_limit_bytes))
+        .layer(CompressionLayer::new())
+        .layer(TimeoutLayer::new(state.config.server.request_timeout()))
         .layer(
-            ServiceBuilder::new()
-                // Tracing layer for observability
-                .layer(
-                    TraceLayer::new_for_http()
-                        .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                        .on_request(DefaultOnRequest::new().level(Level::INFO))
-                        .on_response(DefaultOnResponse::new().level(Level::INFO))
-                )
-                // Request timeout
-                .layer(TimeoutLayer::new(state.config.server.request_timeout()))
-                // Response compression
-                .layer(CompressionLayer::new())
-                // Request body size limit
-                .layer(RequestBodyLimitLayer::new(state.config.server.body_limit_bytes))
-                // CORS handling
-                .layer(cors)
-                // Request ID middleware (must be early in the stack)
-                .layer(middleware::from_fn(request_id_middleware))
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO))
         )
+        .layer(middleware::from_fn(request_id_middleware))
         .with_state(state)
 }

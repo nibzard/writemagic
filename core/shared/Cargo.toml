@@ -9,17 +9,17 @@ repository.workspace = true
 
 [features]
 default = []
+database = []
 jemalloc = ["tikv-jemallocator", "tikv-jemalloc-ctl"]
 file-logging = ["tracing-appender"]
 opentelemetry = ["tracing-opentelemetry"]
 portable_simd = []
 wasm = ["getrandom/js"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
 
 [dependencies]
 # Async
 async-trait.workspace = true
-tokio.workspace = true
-tokio-util.workspace = true
 
 # Serialization
 serde.workspace = true
@@ -30,14 +30,37 @@ anyhow.workspace = true
 thiserror.workspace = true
 
 # UUID and time
-uuid.workspace = true
 chrono.workspace = true
 
 # Validation
 validator.workspace = true
 
-# Database
-sqlx.workspace = true
+# WASM-specific dependencies
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { version = "1.44", default-features = false, features = ["rt", "macros", "time", "sync"] }
+wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
+web-sys = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde", "js"] }
+# Add WASM-compatible versions of common dependencies  
+regex = { workspace = true }
+sha2 = { workspace = true }
+smallvec = { workspace = true }
+arrayvec = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Database, networking and advanced performance (conditional for WASM)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true, features = ["net"] }
+tokio-util = { workspace = true }
+memmap2 = { workspace = true }
+num_cpus = { workspace = true }
+crossbeam = { workspace = true }
+rayon = { workspace = true }
+atty = { workspace = true }
+uuid = { workspace = true }
 
 # Text processing
 regex.workspace = true
@@ -48,27 +71,24 @@ sha2.workspace = true
 # Logging
 log.workspace = true
 tracing.workspace = true
+tracing-subscriber.workspace = true
 
-# Performance collections
+# Performance collections (WASM compatible)
 smallvec.workspace = true
 arrayvec.workspace = true
 bytes.workspace = true
 
-# Advanced performance
-memmap2.workspace = true
-num_cpus.workspace = true
-crossbeam.workspace = true
-rayon.workspace = true
-atty.workspace = true
-
 # WASM dependencies (optional)
-getrandom = { workspace = true, optional = true }
+getrandom = { workspace = true, optional = true, features = ["js"] }
 
 # Optional features
 tikv-jemallocator = { workspace = true, optional = true }
 tikv-jemalloc-ctl = { workspace = true, optional = true }
 tracing-appender = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
+
+# WASM-specific dependencies
+console_error_panic_hook = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = "3.8"

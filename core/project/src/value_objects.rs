@@ -25,7 +25,7 @@ impl fmt::Display for ProjectStatus {
 }
 
 /// Project priority level
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ProjectPriority {
     Low,
     Medium,

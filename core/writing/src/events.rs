@@ -3,7 +3,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use writemagic_shared::{EntityId, Timestamp, DomainEvent};
-use writemagic_shared::events::BaseEvent;
 use std::collections::HashMap;
 
 /// Document domain events
@@ -100,6 +99,10 @@ impl DomainEvent for DocumentEvent {
         metadata.insert("aggregate_type".to_string(), "document".to_string());
         metadata
     }
+
+    fn as_any(&self) -> &(dyn std::any::Any + 'static) {
+        self
+    }
 }
 
 /// Project domain events
@@ -188,5 +191,9 @@ impl DomainEvent for ProjectEvent {
         metadata.insert("domain".to_string(), "writing".to_string());
         metadata.insert("aggregate_type".to_string(), "project".to_string());
         metadata
+    }
+
+    fn as_any(&self) -> &(dyn std::any::Any + 'static) {
+        self
     }
 }

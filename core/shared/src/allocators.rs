@@ -154,8 +154,8 @@ impl ArenaAllocator {
     }
 }
 
-/// Thread-local arena allocator for zero-contention allocation
 thread_local! {
+    /// Thread-local arena allocator for zero-contention allocation
     static THREAD_ARENA: std::cell::RefCell<ArenaAllocator> = 
         std::cell::RefCell::new(ArenaAllocator::new(1024 * 1024)); // 1MB per thread
 }
@@ -186,6 +186,12 @@ pub fn thread_arena_stats() -> (usize, usize, f64) {
 pub struct StackAllocator<const N: usize> {
     buffer: [u8; N],
     top: usize,
+}
+
+impl<const N: usize> Default for StackAllocator<N> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const N: usize> StackAllocator<N> {
@@ -259,8 +265,8 @@ impl<T> PoolAllocator<T> {
         }
         
         // Add all but one to free list
-        for i in 1..self.chunk_size {
-            self.free_list.push(&mut chunk[i] as *mut T);
+        for item in chunk.iter_mut().skip(1) {
+            self.free_list.push(item as *mut T);
         }
         
         // Return the first one
@@ -302,6 +308,12 @@ pub struct TrackingAllocator {
     allocations: std::sync::atomic::AtomicUsize,
     deallocations: std::sync::atomic::AtomicUsize,
     bytes_allocated: std::sync::atomic::AtomicUsize,
+}
+
+impl Default for TrackingAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TrackingAllocator {
@@ -354,7 +366,6 @@ unsafe impl GlobalAlloc for TrackingAllocator {
 
 /// Utilities for measuring allocation behavior
 pub mod profiling {
-    use super::*;
     use std::time::Instant;
     
     /// Profile allocation behavior of a function
@@ -367,13 +378,13 @@ pub mod profiling {
         let result = f();
         let duration = start_time.elapsed();
         
-        AllocationProfile {
+        (result, AllocationProfile {
             duration,
             // In a real implementation, these would come from the tracking allocator
             allocations: 0,
             deallocations: 0,
             peak_memory: 0,
-        }
+        })
     }
     
     #[derive(Debug)]

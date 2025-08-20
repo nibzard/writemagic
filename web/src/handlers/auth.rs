@@ -5,15 +5,15 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::error::{AppError, AppResult};
-use crate::extractors::{AuthenticatedUser, ValidatedJson};
+use crate::error::{AppError, Result as AppResult};
+use crate::extractors::AuthenticatedUser;
 use crate::services::auth::{AuthResponse, AuthService, LoginRequest, RefreshRequest, RegisterRequest};
 use crate::state::AppState;
 
 /// Register a new user
 pub async fn register(
     State(state): State<AppState>,
-    ValidatedJson(request): ValidatedJson<RegisterRequest>,
+    Json(request): Json<RegisterRequest>,
 ) -> AppResult<(StatusCode, Json<AuthResponse>)> {
     tracing::info!("User registration attempt for username: {}", request.username);
 
@@ -27,7 +27,7 @@ pub async fn register(
 /// Login user
 pub async fn login(
     State(state): State<AppState>,
-    ValidatedJson(request): ValidatedJson<LoginRequest>,
+    Json(request): Json<LoginRequest>,
 ) -> AppResult<Json<AuthResponse>> {
     tracing::info!("Login attempt for username: {}", request.username);
 
@@ -41,7 +41,7 @@ pub async fn login(
 /// Refresh access token
 pub async fn refresh_token(
     State(state): State<AppState>,
-    ValidatedJson(request): ValidatedJson<RefreshRequest>,
+    Json(request): Json<RefreshRequest>,
 ) -> AppResult<Json<crate::utils::crypto::TokenPair>> {
     tracing::debug!("Token refresh attempt");
 
@@ -91,9 +91,9 @@ pub async fn get_profile(
 
 /// Update user profile
 pub async fn update_profile(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     user: AuthenticatedUser,
-    ValidatedJson(request): ValidatedJson<UpdateProfileRequest>,
+    Json(request): Json<UpdateProfileRequest>,
 ) -> AppResult<Json<UserProfileResponse>> {
     tracing::info!("Updating profile for user: {}", user.user_id);
 
@@ -116,7 +116,7 @@ pub async fn update_profile(
 pub async fn change_password(
     _state: State<AppState>,
     user: AuthenticatedUser,
-    ValidatedJson(request): ValidatedJson<ChangePasswordRequest>,
+    Json(_request): Json<ChangePasswordRequest>,
 ) -> AppResult<StatusCode> {
     tracing::info!("Password change request for user: {}", user.user_id);
 

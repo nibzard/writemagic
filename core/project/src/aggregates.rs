@@ -1,11 +1,10 @@
 //! Project domain aggregates
 
 use writemagic_shared::{EntityId, WritemagicError, Result};
-use crate::entities::{Project, WorkspaceConfig, ProjectMetadata, ProjectTemplate};
+use crate::entities::{Project, WorkspaceConfig, ProjectTemplate};
 use crate::value_objects::{ProjectStatus, ProjectPriority, ProjectGoal, ProjectTag};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Project aggregate root that encapsulates project business logic and invariants
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -220,25 +219,36 @@ impl ProjectAggregate {
     
     /// Update goal progress
     pub fn update_goal_progress(&mut self, goal_type: crate::value_objects::GoalType, new_value: u32) -> Result<()> {
-        if let Some(goal) = self.goals.iter_mut().find(|g| g.goal_type == goal_type) {
-            let old_value = goal.current_value;
-            goal.update_progress(new_value);
+        let goal_type_clone = goal_type.clone();
+        
+        // Find the goal and collect necessary info
+        let goal_info = {
+            if let Some(goal) = self.goals.iter_mut().find(|g| g.goal_type == goal_type) {
+                let old_value = goal.current_value;
+                goal.update_progress(new_value);
+                Some((old_value, goal.is_achieved(), goal.target_value))
+            } else {
+                None
+            }
+        };
+        
+        if let Some((old_value, is_achieved, target_value)) = goal_info {
             self.project.updated_at = Utc::now();
             self.version += 1;
             
             self.add_event(ProjectEvent::GoalProgressUpdated {
                 project_id: self.project.id,
-                goal_type,
+                goal_type: goal_type_clone.clone(),
                 old_value,
                 new_value,
                 timestamp: Utc::now(),
             });
             
             // Check if goal was achieved
-            if goal.is_achieved() && old_value < goal.target_value {
+            if is_achieved && old_value < target_value {
                 self.add_event(ProjectEvent::GoalAchieved {
                     project_id: self.project.id,
-                    goal_type,
+                    goal_type: goal_type_clone,
                     timestamp: Utc::now(),
                 });
             }

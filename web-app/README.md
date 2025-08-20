@@ -96,7 +96,6 @@ web-app/
         ├── document-manager.js
         ├── project-workspace.js
         ├── writing-analytics.js
-        ├── ai-proxy-integration.js
         └── utils/        # Utility modules
 ```
 
@@ -153,7 +152,7 @@ const writeMagic = new WriteMagic({
     claude_api_key: 'your-claude-api-key',
     openai_api_key: 'your-openai-api-key',
     default_model: 'claude-3-haiku-20240307',
-    ai_proxy_url: 'http://localhost:3001' // Your AI proxy service
+    // AI integration now handled via WASM core
 });
 ```
 

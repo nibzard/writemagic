@@ -1,5 +1,7 @@
 //! SQLite repository implementations for writing domain
 
+// Remove duplicated attribute - already defined in lib.rs
+
 use async_trait::async_trait;
 use sqlx::{Row, SqlitePool};
 use std::collections::HashMap;

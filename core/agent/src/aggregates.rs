@@ -1,9 +1,10 @@
 //! Agent domain aggregates
 
 use writemagic_shared::{EntityId, WritemagicError, Result};
-use crate::entities::{Agent, AgentWorkflow, AgentState, AgentStatus, ExecutionContext, ExecutionResult, TriggerType, WorkflowTrigger};
-use crate::value_objects::{ExecutionPriority, ExecutionMode, AgentVersion, ExecutionTimeout, ResourceQuota, PermissionLevel};
-use chrono::{DateTime, Utc, Duration};
+use crate::entities::{Agent, AgentWorkflow, AgentStatus, ExecutionContext, ExecutionResult, TriggerType, WorkflowTrigger};
+use crate::value_objects::ExecutionPriority;
+use chrono::{DateTime, Utc};
+use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -186,7 +187,7 @@ impl AgentAggregate {
     
     /// Update agent workflow
     pub fn update_workflow(&mut self, workflow: AgentWorkflow, updated_by: EntityId) -> Result<()> {
-        let old_version = self.agent.workflow.version.clone();
+        let _old_version = self.agent.workflow.version.clone();
         
         // Validate new workflow
         self.agent.validate_workflow(&workflow)?;
@@ -271,6 +272,7 @@ impl AgentAggregate {
             return Err(WritemagicError::validation("Execution queue is full"));
         }
         
+        let priority_for_comparison = priority.clone();
         let execution = QueuedExecution {
             id: EntityId::new(),
             agent_id: self.agent.id,
@@ -288,7 +290,7 @@ impl AgentAggregate {
         // Insert in priority order
         let insert_pos = self.execution_queue
             .iter()
-            .position(|e| e.priority < priority)
+            .position(|e| e.priority < priority_for_comparison)
             .unwrap_or(self.execution_queue.len());
         
         self.execution_queue.insert(insert_pos, execution);
@@ -298,7 +300,7 @@ impl AgentAggregate {
             agent_id: self.agent.id,
             execution_id,
             trigger_type,
-            priority,
+            priority: priority_for_comparison,
             timestamp: Utc::now(),
         });
         
@@ -348,10 +350,10 @@ impl AgentAggregate {
             user_id: Some(self.agent.created_by),
             project_id: execution.context.get("project_id")
                 .and_then(|v| v.as_str())
-                .and_then(|s| s.parse().ok()),
+                .and_then(|s| EntityId::from_string(s).ok()),
             document_id: execution.context.get("document_id")
                 .and_then(|v| v.as_str())
-                .and_then(|s| s.parse().ok()),
+                .and_then(|s| EntityId::from_string(s).ok()),
             environment: crate::entities::ExecutionEnvironment::Production,
         };
         

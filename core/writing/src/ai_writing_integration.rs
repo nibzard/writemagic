@@ -1,10 +1,11 @@
 //! Integration layer between AI writing service and writing domain
 
-use async_trait::async_trait;
+// Remove duplicated attribute - already defined in lib.rs
+
 use std::sync::Arc;
 use writemagic_shared::{EntityId, Result, WritemagicError};
 
-use crate::entities::{Document, Project};
+use crate::entities::Document;
 use crate::repositories::{DocumentRepository, ProjectRepository};
 use crate::services::{DocumentManagementService, ProjectManagementService, ContentAnalysisService};
 use crate::value_objects::{DocumentContent, DocumentTitle, TextSelection};
@@ -32,18 +33,13 @@ fn convert_text_selection_to_ai(selection: Option<TextSelection>) -> Option<AITe
     })
 }
 
-fn convert_text_selection_from_ai(selection: Option<AITextSelection>) -> Option<TextSelection> {
-    selection.and_then(|sel| {
-        TextSelection::new(sel.start, sel.end).ok()
-    })
-}
 
 /// Integrated writing assistance service that combines AI with document management
 pub struct IntegratedWritingService {
     ai_writing_service: Arc<AIWritingService>,
     document_service: Arc<DocumentManagementService>,
-    project_service: Arc<ProjectManagementService>,
-    content_analysis_service: Arc<ContentAnalysisService>,
+    _project_service: Arc<ProjectManagementService>,
+    _content_analysis_service: Arc<ContentAnalysisService>,
     document_repository: Arc<dyn DocumentRepository>,
     project_repository: Arc<dyn ProjectRepository>,
 }
@@ -60,8 +56,8 @@ impl IntegratedWritingService {
         Self {
             ai_writing_service,
             document_service,
-            project_service,
-            content_analysis_service,
+            _project_service: project_service,
+            _content_analysis_service: content_analysis_service,
             document_repository,
             project_repository,
         }
@@ -513,7 +509,7 @@ impl IntegratedWritingService {
     }
 
     /// Find project containing a document
-    async fn find_project_for_document(&self, document_id: EntityId) -> Result<Option<ProjectContext>> {
+    async fn find_project_for_document(&self, _document_id: EntityId) -> Result<Option<ProjectContext>> {
         // This would require a more sophisticated query or index
         // For now, we'll skip this optimization
         Ok(None)

@@ -20,5 +20,6 @@ git2.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 validator.workspace = true
+garde.workspace = true
 log.workspace = true
 tracing.workspace = true

@@ -8,6 +8,7 @@ use migration;
 use crate::config::Config;
 use crate::error::Result;
 use crate::middleware::RateLimitState;
+use crate::utils::crypto::JwtKeys;
 use crate::websocket::ConnectionManager;
 
 /// Application state that holds all shared resources
@@ -39,11 +40,6 @@ pub struct CachedValue {
     pub expires_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// JWT keys for token signing and verification
-pub struct JwtKeys {
-    pub encoding_key: jsonwebtoken::EncodingKey,
-    pub decoding_key: jsonwebtoken::DecodingKey,
-}
 
 impl AppState {
     /// Create a new application state instance
@@ -53,16 +49,16 @@ impl AppState {
         // Initialize SeaORM database connection
         let db = Database::connect(&config.database.url)
             .await
-            .map_err(|e| crate::error::AppError::Database(format!("Failed to connect to database: {}", e)))?;
+            .map_err(|e| crate::error::AppError::Database(writemagic_shared::WritemagicError::database(format!("Failed to connect to database: {}", e))))?;
         
         // Run migrations
         migration::Migrator::up(&db, None)
             .await
-            .map_err(|e| crate::error::AppError::Database(format!("Failed to run migrations: {}", e)))?;
+            .map_err(|e| crate::error::AppError::Database(writemagic_shared::WritemagicError::database(format!("Failed to run migrations: {}", e))))?;
         
         // Initialize core engine with database connection
         let core_engine = Arc::new(
-            CoreEngine::initialize(&config.database.url)
+            CoreEngine::initialize()
                 .await
                 .map_err(|e| crate::error::AppError::Internal(e.into()))?
         );
@@ -77,7 +73,8 @@ impl AppState {
             .map_err(|e| crate::error::AppError::Internal(e.into()))?;
         
         // Initialize JWT keys
-        let jwt_keys = Arc::new(JwtKeys::from_config(&config)?);
+        let (jwt_keys, _) = JwtKeys::generate();
+        let jwt_keys = Arc::new(jwt_keys);
         
         // Create cache with reasonable capacity
         let cache = Arc::new(DashMap::with_capacity(10_000));
@@ -150,17 +147,3 @@ impl AppState {
     }
 }
 
-impl JwtKeys {
-    /// Create JWT keys from configuration
-    pub fn from_config(config: &Config) -> Result<Self> {
-        let secret = config.auth.jwt_secret.as_bytes();
-        
-        let encoding_key = jsonwebtoken::EncodingKey::from_secret(secret);
-        let decoding_key = jsonwebtoken::DecodingKey::from_secret(secret);
-        
-        Ok(Self {
-            encoding_key,
-            decoding_key,
-        })
-    }
-}

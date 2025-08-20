@@ -1,0 +1,67 @@
+[package]
+name = "writemagic-integration-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync", "fs", "process", "signal"] }
+anyhow = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["v4", "serde"] }
+
+# Testing frameworks
+criterion = { workspace = true, features = ["html_reports"] }
+proptest = { workspace = true }
+testcontainers = { workspace = true }
+axum-test = { workspace = true }
+tempfile = { workspace = true }
+
+# Database testing
+sqlx = { workspace = true, features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid", "macros"] }
+
+# HTTP testing
+reqwest = { workspace = true, features = ["json", "rustls-tls"] }
+hyper = { workspace = true, features = ["full"] }
+
+# Logging and observability
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
+
+# Performance testing
+bytes = { workspace = true }
+rayon = { workspace = true }
+crossbeam = { workspace = true }
+
+# Local workspace dependencies
+writemagic-shared = { path = "../core/shared" }
+writemagic-writing = { path = "../core/writing" }
+writemagic-ai = { path = "../core/ai" }
+writemagic-project = { path = "../core/project" }
+writemagic-wasm = { path = "../core/wasm" }
+
+[dev-dependencies]
+# Additional test utilities
+mockall = "0.12"
+wiremock = "0.6"
+
+# Add missing dependencies
+futures = { workspace = true }
+toml = "0.8"
+
+# Enhanced testing dependencies
+fastrand = "2.0"
+unicode-normalization = "0.1"
+base64 = "0.22"
+regex = { workspace = true }
+clap = "3.2"
+
+[[bin]]
+name = "test-orchestrator"
+path = "orchestration/main.rs"
+
+[lib]
+name = "integration_tests"
+path = "lib.rs"

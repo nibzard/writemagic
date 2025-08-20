@@ -27,7 +27,7 @@ hyper = { workspace = true }
 hyper-util = { workspace = true }
 
 # Async Runtime
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["net"] }
 tokio-util = { workspace = true }
 
 # Database
@@ -71,6 +71,9 @@ reqwest = { workspace = true }
 
 # URL parsing
 url = { workspace = true }
+
+# Random number generation
+rand = "0.8"
 
 [dev-dependencies]
 # Testing framework

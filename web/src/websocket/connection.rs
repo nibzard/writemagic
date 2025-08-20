@@ -1,5 +1,5 @@
 use axum::extract::ws::{Message, WebSocket};
-use futures::{sink::SinkExt, stream::StreamExt};
+use futures::stream::StreamExt;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;

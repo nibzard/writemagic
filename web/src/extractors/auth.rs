@@ -3,9 +3,6 @@ use axum::{
     http::{request::Parts, StatusCode},
     response::{IntoResponse, Response},
 };
-use serde::Serialize;
-
-use crate::error::{AppError, AppResult};
 use crate::services::auth::UserInfo;
 use crate::state::AppState;
 use crate::utils::crypto::Claims;

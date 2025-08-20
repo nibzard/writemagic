@@ -1,7 +1,6 @@
 //! High-performance buffer pool for zero-allocation request processing
 
 use std::sync::Mutex;
-use std::mem::MaybeUninit;
 use smallvec::SmallVec;
 use arrayvec::ArrayVec;
 
@@ -25,23 +24,24 @@ impl BufferPool {
     }
     
     /// Acquire a buffer from the pool
-    pub fn acquire(&self) -> PooledBuffer {
-        let mut pool = self.pool.lock().unwrap();
+    pub fn acquire(&self) -> Option<PooledBuffer> {
+        let mut pool = self.pool.lock().ok()?;
         let mut buffer = pool.pop()
             .unwrap_or_else(|| Vec::with_capacity(self.buffer_size));
         buffer.clear();
         
-        PooledBuffer {
+        Some(PooledBuffer {
             buffer,
             pool_ptr: self as *const Self,
-        }
+        })
     }
     
     /// Return a buffer to the pool (called by PooledBuffer::drop)
     fn return_buffer(&self, buffer: Vec<u8>) {
-        let mut pool = self.pool.lock().unwrap();
-        if pool.len() < 32 { // Limit pool size to prevent unbounded growth
-            pool.push(buffer);
+        if let Ok(mut pool) = self.pool.lock() {
+            if pool.len() < 32 { // Limit pool size to prevent unbounded growth
+                pool.push(buffer);
+            }
         }
     }
 }
@@ -152,8 +152,8 @@ impl Default for WorkingMemory {
     }
 }
 
-/// Thread-local working memory to avoid allocations in hot paths
 thread_local! {
+    /// Thread-local working memory to avoid allocations in hot paths
     static WORKING_MEMORY: std::cell::RefCell<WorkingMemory> = std::cell::RefCell::new(WorkingMemory::new());
 }
 

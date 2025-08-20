@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
 mod entities;
@@ -74,17 +73,21 @@ async fn main() -> anyhow::Result<()> {
 
 async fn shutdown_signal() {
     let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
+        if let Err(e) = tokio::signal::ctrl_c().await {
+            tracing::error!("Failed to install Ctrl+C handler: {}", e);
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                signal.recv().await;
+            }
+            Err(e) => {
+                tracing::error!("Failed to install signal handler: {}", e);
+            }
+        }
     };
 
     #[cfg(not(unix))]

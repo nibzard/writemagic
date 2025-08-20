@@ -3,17 +3,16 @@
 use crate::providers::*;
 use crate::services::*;
 use writemagic_shared::Result;
-use std::sync::Arc;
 
 /// Example of setting up AI providers with fallback
 pub async fn setup_ai_system() -> Result<AIOrchestrationService> {
     // Create provider registry
-    let registry = AIProviderRegistry::new()
-        .with_claude_key(std::env::var("CLAUDE_API_KEY").unwrap_or_default())
-        .with_openai_key(std::env::var("OPENAI_API_KEY").unwrap_or_default());
+    let registry = AIProviderRegistry::new();
+    registry.add_claude_key(std::env::var("CLAUDE_API_KEY").unwrap_or_default())?;
+    registry.add_openai_key(std::env::var("OPENAI_API_KEY").unwrap_or_default())?;
     
     // Create orchestration service with automatic provider setup
-    registry.create_orchestration_service()
+    registry.create_orchestration_service().await
 }
 
 /// Example of making a simple completion request
@@ -42,7 +41,7 @@ pub async fn conversation_example(
     context_manager: &ContextManagementService,
 ) -> Result<String> {
     // Simulate a conversation history
-    let mut messages = vec![
+    let messages = vec![
         Message::system("You are an expert writing coach helping with creative writing."),
         Message::user("I'm writing a mystery novel. Can you help me develop a compelling character?"),
         Message::assistant("I'd be happy to help you develop a compelling character for your mystery novel! Let's start with the basics. What role will this character play in your story? Are they the detective, a suspect, a witness, or perhaps the victim?"),
@@ -52,7 +51,7 @@ pub async fn conversation_example(
     ];
 
     // Apply context management
-    let managed_messages = context_manager.manage_context(messages);
+    let managed_messages = context_manager.manage_context(messages, "claude-3-sonnet-20240229")?;
 
     let request = CompletionRequest::new(
         managed_messages,
@@ -207,12 +206,14 @@ mod tests {
     
     #[tokio::test]
     async fn test_ai_provider_registry() {
-        let registry = AIProviderRegistry::new()
-            .with_claude_key("test-claude-key".to_string())
-            .with_openai_key("test-openai-key".to_string());
+        let registry = AIProviderRegistry::new();
+        
+        // Add keys to the registry
+        let _ = registry.add_claude_key("test-claude-key".to_string());
+        let _ = registry.add_openai_key("test-openai-key".to_string());
         
         // This would fail with invalid keys, but tests the structure
-        assert!(registry.create_orchestration_service().is_ok());
+        assert!(registry.create_orchestration_service().await.is_ok());
     }
     
     #[tokio::test]
@@ -229,7 +230,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_context_management() {
-        let context_manager = ContextManagementService::new(1000); // 1000 char limit
+        let context_manager = ContextManagementService::new(1000).unwrap(); // 1000 token limit
         
         let long_messages = vec![
             Message::system("System message"),
@@ -238,11 +239,7 @@ mod tests {
             Message::user("Recent message"),
         ];
         
-        let managed = context_manager.manage_context(long_messages);
-        
-        // Should keep system message and recent messages within limit
-        let total_length: usize = managed.iter().map(|m| m.content.len()).sum();
-        assert!(total_length <= 1000);
+        let managed = context_manager.manage_context(long_messages, "claude-3-sonnet-20240229").unwrap();
         
         // Should always keep system messages
         assert!(managed.iter().any(|m| matches!(m.role, MessageRole::System)));

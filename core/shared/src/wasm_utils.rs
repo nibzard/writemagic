@@ -127,7 +127,6 @@ pub enum WasmStorageType {
 }
 
 /// WASM runtime initialization result
-#[derive(Debug)]
 pub struct WasmInitResult {
     /// Whether initialization was successful
     pub success: bool,
@@ -135,6 +134,16 @@ pub struct WasmInitResult {
     pub storage: Box<dyn WasmStorage>,
     /// Any initialization messages
     pub messages: Vec<String>,
+}
+
+impl std::fmt::Debug for WasmInitResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WasmInitResult")
+            .field("success", &self.success)
+            .field("storage", &"Box<dyn WasmStorage>")
+            .field("messages", &self.messages)
+            .finish()
+    }
 }
 
 /// Initialize WASM runtime with given configuration

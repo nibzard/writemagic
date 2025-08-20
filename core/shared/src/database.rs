@@ -1,10 +1,11 @@
 //! Database initialization and migration system
 
 use sqlx::{Row, SqliteConnection, SqlitePool};
+// Remove unused serde imports
 use crate::{Result, WritemagicError};
 
 /// Database configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DatabaseConfig {
     pub database_url: String,
     pub max_connections: u32,
@@ -37,12 +38,12 @@ impl DatabaseManager {
         let pool = if config.database_url == "sqlite::memory:" {
             // Special handling for in-memory database
             SqlitePool::connect("sqlite::memory:").await.map_err(|e| {
-                WritemagicError::database(&format!("Failed to connect to database: {}", e))
+                WritemagicError::database(format!("Failed to connect to database: {}", e))
             })?
         } else {
             SqlitePool::connect_with(
                 sqlx::sqlite::SqliteConnectOptions::new()
-                    .filename(&config.database_url.replace("sqlite://", ""))
+                    .filename(config.database_url.replace("sqlite://", ""))
                     .create_if_missing(true)
                     .journal_mode(if config.enable_wal {
                         sqlx::sqlite::SqliteJournalMode::Wal
@@ -52,7 +53,7 @@ impl DatabaseManager {
                     .foreign_keys(config.enable_foreign_keys)
                     .busy_timeout(std::time::Duration::from_secs(30))
             ).await.map_err(|e| {
-                WritemagicError::database(&format!("Failed to connect to database: {}", e))
+                WritemagicError::database(format!("Failed to connect to database: {}", e))
             })?
         };
 
@@ -89,29 +90,29 @@ impl DatabaseManager {
     /// Setup database with initial configuration
     async fn setup(&self) -> Result<()> {
         let mut conn = self.pool.acquire().await.map_err(|e| {
-            WritemagicError::database(&format!("Failed to acquire connection: {}", e))
+            WritemagicError::database(format!("Failed to acquire connection: {}", e))
         })?;
 
         // Enable pragmas for performance and integrity
         sqlx::query("PRAGMA journal_mode = WAL")
             .execute(&mut *conn)
             .await
-            .map_err(|e| WritemagicError::database(&format!("Failed to set journal mode: {}", e)))?;
+            .map_err(|e| WritemagicError::database(format!("Failed to set journal mode: {}", e)))?;
 
         sqlx::query("PRAGMA synchronous = NORMAL")
             .execute(&mut *conn)
             .await
-            .map_err(|e| WritemagicError::database(&format!("Failed to set synchronous mode: {}", e)))?;
+            .map_err(|e| WritemagicError::database(format!("Failed to set synchronous mode: {}", e)))?;
 
         sqlx::query("PRAGMA cache_size = 1000")
             .execute(&mut *conn)
             .await
-            .map_err(|e| WritemagicError::database(&format!("Failed to set cache size: {}", e)))?;
+            .map_err(|e| WritemagicError::database(format!("Failed to set cache size: {}", e)))?;
 
         sqlx::query("PRAGMA foreign_keys = ON")
             .execute(&mut *conn)
             .await
-            .map_err(|e| WritemagicError::database(&format!("Failed to enable foreign keys: {}", e)))?;
+            .map_err(|e| WritemagicError::database(format!("Failed to enable foreign keys: {}", e)))?;
 
         // Run migrations
         self.run_migrations(&mut conn).await?;
@@ -133,7 +134,7 @@ impl DatabaseManager {
         )
         .execute(&mut *conn)
         .await
-        .map_err(|e| WritemagicError::database(&format!("Failed to create migrations table: {}", e)))?;
+        .map_err(|e| WritemagicError::database(format!("Failed to create migrations table: {}", e)))?;
 
         // Run each migration
         for migration in MIGRATIONS {
@@ -144,7 +145,7 @@ impl DatabaseManager {
                 sqlx::query(migration.sql)
                     .execute(&mut *conn)
                     .await
-                    .map_err(|e| WritemagicError::database(&format!("Failed to apply migration {}: {}", migration.name, e)))?;
+                    .map_err(|e| WritemagicError::database(format!("Failed to apply migration {}: {}", migration.name, e)))?;
 
                 // Record migration as applied
                 sqlx::query(
@@ -153,7 +154,7 @@ impl DatabaseManager {
                 .bind(migration.name)
                 .execute(&mut *conn)
                 .await
-                .map_err(|e| WritemagicError::database(&format!("Failed to record migration {}: {}", migration.name, e)))?;
+                .map_err(|e| WritemagicError::database(format!("Failed to record migration {}: {}", migration.name, e)))?;
             }
         }
 
@@ -168,7 +169,7 @@ impl DatabaseManager {
         .bind(name)
         .fetch_one(&mut *conn)
         .await
-        .map_err(|e| WritemagicError::database(&format!("Failed to check migration status: {}", e)))?;
+        .map_err(|e| WritemagicError::database(format!("Failed to check migration status: {}", e)))?;
 
         let count: i64 = row.get("count");
         Ok(count > 0)
@@ -177,7 +178,7 @@ impl DatabaseManager {
     /// Get migration status
     pub async fn get_migration_status(&self) -> Result<Vec<MigrationStatus>> {
         let mut conn = self.pool.acquire().await.map_err(|e| {
-            WritemagicError::database(&format!("Failed to acquire connection: {}", e))
+            WritemagicError::database(format!("Failed to acquire connection: {}", e))
         })?;
 
         let rows = sqlx::query(
@@ -185,7 +186,7 @@ impl DatabaseManager {
         )
         .fetch_all(&mut *conn)
         .await
-        .map_err(|e| WritemagicError::database(&format!("Failed to get migration status: {}", e)))?;
+        .map_err(|e| WritemagicError::database(format!("Failed to get migration status: {}", e)))?;
 
         let mut status = Vec::new();
         for migration in MIGRATIONS {

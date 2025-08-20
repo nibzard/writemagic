@@ -185,6 +185,53 @@ object WriteMagicCore {
         }
     }
     
+    /**
+     * Create a new project
+     */
+    suspend fun createProject(name: String, description: String = ""): String? = withContext(Dispatchers.IO) {
+        if (!isInitialized) {
+            Log.e(TAG, "Core not initialized")
+            return@withContext null
+        }
+        
+        try {
+            val jsonResult = nativeCreateProject(name, description)
+            if (jsonResult != null) {
+                Log.i(TAG, "Successfully created project: $name")
+                jsonResult
+            } else {
+                Log.e(TAG, "Failed to create project")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creating project: ${e.message}")
+            null
+        }
+    }
+    
+    /**
+     * Get project by ID
+     */
+    suspend fun getProject(projectId: String): String? = withContext(Dispatchers.IO) {
+        if (!isInitialized) {
+            Log.e(TAG, "Core not initialized")
+            return@withContext null
+        }
+        
+        try {
+            val jsonResult = nativeGetProject(projectId)
+            if (jsonResult != null) {
+                jsonResult
+            } else {
+                Log.w(TAG, "Project $projectId not found")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting project: ${e.message}")
+            null
+        }
+    }
+    
     // Native FFI method declarations
     private external fun nativeInitialize(claudeKey: String, openaiKey: String): Boolean
     private external fun nativeCreateDocument(title: String, content: String, contentType: String): String?
@@ -192,4 +239,6 @@ object WriteMagicCore {
     private external fun nativeGetDocument(documentId: String): String?
     private external fun nativeListDocuments(offset: Int, limit: Int): String?
     private external fun nativeCompleteText(prompt: String, model: String): String?
+    private external fun nativeCreateProject(name: String, description: String): String?
+    private external fun nativeGetProject(projectId: String): String?
 }

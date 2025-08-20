@@ -2,65 +2,78 @@
 
 use std::sync::Arc;
 use std::collections::HashMap;
-use writemagic_shared::{DatabaseManager, DatabaseConfig, Result, WritemagicError};
+#[cfg(not(target_arch = "wasm32"))]
+use writemagic_shared::{DatabaseManager, DatabaseConfig, Result, WritemagicError, EventBus, InMemoryEventBus, CrossDomainServiceRegistry, CrossDomainCoordinator, EntityId};
+
+#[cfg(target_arch = "wasm32")]
+use writemagic_shared::{Result, WritemagicError, EventBus, InMemoryEventBus, CrossDomainServiceRegistry, CrossDomainCoordinator, EntityId};
 use crate::repositories::{DocumentRepository, ProjectRepository};
-use crate::{InMemoryDocumentRepository, InMemoryProjectRepository, SqliteDocumentRepository, SqliteProjectRepository};
+use crate::{InMemoryDocumentRepository, InMemoryProjectRepository};
+#[cfg(feature = "database")]
+use crate::{SqliteDocumentRepository, SqliteProjectRepository};
 use crate::services::{DocumentManagementService, ProjectManagementService, ContentAnalysisService};
+#[cfg(feature = "ai")]
 use crate::ai_writing_integration::{IntegratedWritingService, IntegratedWritingServiceBuilder};
 
 // Import IndexedDB repositories for WASM builds
 #[cfg(target_arch = "wasm32")]
 use crate::web_persistence::{IndexedDbManager, IndexedDbConfig, IndexedDbDocumentRepository, IndexedDbProjectRepository, check_indexeddb_support};
 
-// Import AI components
+// Import AI components (conditional for WASM builds)
+#[cfg(feature = "ai")]
 use writemagic_ai::{
     AIOrchestrationService, 
     AIProviderRegistry, 
     ContextManagementService, 
     ContentFilteringService,
-    ClaudeProvider,
-    OpenAIProvider,
     AIWritingService,
 };
+use writemagic_agent::{TriggerType, ExecutionStrategy};
 
 // Import domain services
-use writemagic_project::services::{ProjectManagementService as ProjectDomainService, ProjectTemplateService, ProjectAnalyticsService};
-use writemagic_version_control::services::{VersionControlService, DiffService, TimelineService};
-use writemagic_agent::services::{AgentManagementService, AgentExecutionService, AgentWorkflowService, AgentOrchestrationService};
+// TODO: Add back when these modules are available
+// use writemagic_project::services::{ProjectManagementService as ProjectDomainService, ProjectTemplateService, ProjectAnalyticsService};
+// use writemagic_version_control::services::{VersionControlService, DiffService, TimelineService};
+// use writemagic_agent::services::{AgentManagementService, AgentExecutionService, AgentWorkflowService, AgentOrchestrationService};
 
 // Import cross-domain coordination
-use writemagic_shared::{
-    CrossDomainServiceRegistry, CrossDomainCoordinator, InMemoryEventBus, EventBus, 
-    WritingDomainService, AIDomainService, ProjectDomainService as ProjectService,
-    VersionControlDomainService, AgentDomainService as AgentService
-};
+// TODO: Add back cross-domain services when available
+// use writemagic_shared::{
+//     CrossDomainServiceRegistry, CrossDomainCoordinator, InMemoryEventBus, EventBus, 
+//     WritingDomainService, AIDomainService, ProjectDomainService as ProjectService,
+//     VersionControlDomainService, AgentDomainService as AgentService
+// };
 
 // Import repositories
-use writemagic_project::repositories::{ProjectRepository as ProjectDomainRepository, ProjectRepositoryFactory as ProjectFactory};
-use writemagic_version_control::repositories::{VersionControlRepository, RepositoryFactory as VcFactory};
-use writemagic_agent::repositories::{AgentRepository, AgentRepositoryFactory};
+// TODO: Add back when these modules are available
+// use writemagic_project::repositories::{ProjectRepository as ProjectDomainRepository, ProjectRepositoryFactory as ProjectFactory};
+// use writemagic_version_control::repositories::{VersionControlRepository, RepositoryFactory as VcFactory};
+// use writemagic_agent::repositories::{AgentRepository, AgentRepositoryFactory};
 
 /// Application configuration for the entire WriteMagic stack
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ApplicationConfig {
+    #[cfg(not(target_arch = "wasm32"))]
     pub database: DatabaseConfig,
     pub storage: StorageConfig,
+    #[cfg(feature = "ai")]
     pub ai: AIConfig,
     pub logging: LoggingConfig,
     pub security: SecurityConfig,
 }
 
 /// Storage configuration for different platforms
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StorageConfig {
     pub storage_type: StorageType,
+    #[cfg(not(target_arch = "wasm32"))]
     pub database_config: Option<DatabaseConfig>,
     #[cfg(target_arch = "wasm32")]
     pub indexeddb_config: Option<IndexedDbConfig>,
 }
 
 /// Storage backend types
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StorageType {
     InMemory,
     SQLite,
@@ -69,7 +82,8 @@ pub enum StorageType {
 }
 
 /// AI provider configuration
-#[derive(Debug, Clone)]
+#[cfg(feature = "ai")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AIConfig {
     pub claude_api_key: Option<String>,
     pub openai_api_key: Option<String>,
@@ -79,15 +93,29 @@ pub struct AIConfig {
     pub cache_ttl_seconds: u64,
 }
 
+#[cfg(feature = "ai")]
+impl Default for AIConfig {
+    fn default() -> Self {
+        Self {
+            claude_api_key: None,
+            openai_api_key: None,
+            default_model: "gpt-4".to_string(),
+            max_context_length: 32000,
+            enable_content_filtering: true,
+            cache_ttl_seconds: 3600,
+        }
+    }
+}
+
 /// Logging configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LoggingConfig {
     pub level: String,
     pub enable_tracing: bool,
 }
 
 /// Security configuration  
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SecurityConfig {
     pub encrypt_at_rest: bool,
     pub api_rate_limit_per_hour: u32,
@@ -105,12 +133,16 @@ impl Default for ApplicationConfig {
         #[cfg(not(target_arch = "wasm32"))]
         let storage = StorageConfig {
             storage_type: StorageType::SQLite,
+            #[cfg(not(target_arch = "wasm32"))]
             database_config: Some(DatabaseConfig::default()),
         };
         
         Self {
+            #[cfg(not(target_arch = "wasm32"))]
             database: DatabaseConfig::default(), // For backwards compatibility
             storage,
+            #[cfg(feature = "ai")]
+            #[cfg(feature = "ai")]
             ai: AIConfig::default(),
             logging: LoggingConfig::default(),
             security: SecurityConfig::default(),
@@ -133,24 +165,13 @@ impl Default for StorageConfig {
         {
             Self {
                 storage_type: StorageType::SQLite,
-                database_config: Some(DatabaseConfig::default()),
+                #[cfg(not(target_arch = "wasm32"))]
+            database_config: Some(DatabaseConfig::default()),
             }
         }
     }
 }
 
-impl Default for AIConfig {
-    fn default() -> Self {
-        Self {
-            claude_api_key: None,
-            openai_api_key: None,
-            default_model: "claude-3-haiku-20240307".to_string(),
-            max_context_length: 8000,
-            enable_content_filtering: true,
-            cache_ttl_seconds: 600,
-        }
-    }
-}
 
 impl Default for LoggingConfig {
     fn default() -> Self {
@@ -173,6 +194,7 @@ impl Default for SecurityConfig {
 /// Core engine configuration (legacy, for backwards compatibility)
 #[derive(Debug, Clone)]
 pub struct CoreEngineConfig {
+    #[cfg(not(target_arch = "wasm32"))]
     pub database_config: Option<DatabaseConfig>,
     pub use_in_memory: bool,
 }
@@ -198,12 +220,14 @@ impl CoreEngineConfig {
     /// Create config for SQLite with default settings
     pub fn sqlite() -> Self {
         Self {
+            #[cfg(not(target_arch = "wasm32"))]
             database_config: Some(DatabaseConfig::default()),
             use_in_memory: false,
         }
     }
 
     /// Create config for SQLite with custom settings
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn sqlite_with_config(config: DatabaseConfig) -> Self {
         Self {
             database_config: Some(config),
@@ -212,6 +236,7 @@ impl CoreEngineConfig {
     }
 
     /// Create config for SQLite in-memory database (for testing)
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn sqlite_in_memory() -> Self {
         Self {
             database_config: Some(DatabaseConfig {
@@ -232,6 +257,7 @@ pub struct CoreEngine {
     config: ApplicationConfig,
     
     // Database manager (if using SQLite)
+    #[cfg(not(target_arch = "wasm32"))]
     database_manager: Option<DatabaseManager>,
     
     // IndexedDB manager (if using IndexedDB)
@@ -242,39 +268,46 @@ pub struct CoreEngine {
     document_repository: Arc<dyn DocumentRepository>,
     project_repository: Arc<dyn ProjectRepository>,
     
-    // Repository implementations - New domains
-    project_domain_repository: Arc<dyn ProjectDomainRepository>,
-    version_control_repository: Arc<dyn VersionControlRepository>,
-    agent_repository: Arc<dyn AgentRepository>,
+    // TODO: Uncomment when dependencies are available
+    // // Repository implementations - New domains
+    // project_domain_repository: Arc<dyn ProjectDomainRepository>,
+    // version_control_repository: Arc<dyn VersionControlRepository>,
+    // agent_repository: Arc<dyn AgentRepository>,
     
-    // AI services
+    // AI services (conditional)
+    #[cfg(feature = "ai")]
     ai_orchestration_service: Option<AIOrchestrationService>,
+    #[cfg(feature = "ai")]
     context_management_service: ContextManagementService,
+    #[cfg(feature = "ai")]
     content_filtering_service: Option<ContentFilteringService>,
+    #[cfg(feature = "ai")]
     ai_writing_service: Option<AIWritingService>,
     
     // Writing domain services
     document_management_service: Arc<DocumentManagementService>,
     project_management_service: Arc<ProjectManagementService>,
     content_analysis_service: Arc<ContentAnalysisService>,
+    #[cfg(feature = "ai")]
     integrated_writing_service: Option<Arc<IntegratedWritingService>>,
     
-    // New domain services
-    project_domain_service: Arc<ProjectDomainService>,
-    project_template_service: Arc<ProjectTemplateService>,
-    project_analytics_service: Arc<ProjectAnalyticsService>,
-    version_control_service: Arc<VersionControlService>,
-    diff_service: Arc<DiffService>,
-    timeline_service: Arc<TimelineService>,
-    agent_management_service: Arc<AgentManagementService>,
-    agent_execution_service: Arc<AgentExecutionService>,
-    agent_workflow_service: Arc<AgentWorkflowService>,
-    agent_orchestration_service: Arc<AgentOrchestrationService>,
-    
-    // Cross-domain coordination
-    event_bus: Arc<dyn EventBus>,
-    service_registry: Arc<CrossDomainServiceRegistry>,
-    cross_domain_coordinator: Arc<CrossDomainCoordinator>,
+    // TODO: Uncomment when dependencies are available
+    // // New domain services
+    // project_domain_service: Arc<ProjectDomainService>,
+    // project_template_service: Arc<ProjectTemplateService>,
+    // project_analytics_service: Arc<ProjectAnalyticsService>,
+    // version_control_service: Arc<VersionControlService>,
+    // diff_service: Arc<DiffService>,
+    // timeline_service: Arc<TimelineService>,
+    // agent_management_service: Arc<AgentManagementService>,
+    // agent_execution_service: Arc<AgentExecutionService>,
+    // agent_workflow_service: Arc<AgentWorkflowService>,
+    // agent_orchestration_service: Arc<AgentOrchestrationService>,
+    // 
+    // // Cross-domain coordination
+    // event_bus: Arc<dyn EventBus>,
+    // service_registry: Arc<CrossDomainServiceRegistry>,
+    // cross_domain_coordinator: Arc<CrossDomainCoordinator>,
     
     // Runtime for async operations
     tokio_runtime: Arc<tokio::runtime::Runtime>,
@@ -292,16 +325,13 @@ impl CoreEngine {
         );
 
         // Initialize storage based on configuration
-        let (database_manager, document_repository, project_repository, project_domain_repository, version_control_repository, agent_repository) = match config.storage.storage_type {
+        let (database_manager, document_repository, project_repository) = match config.storage.storage_type {
             StorageType::InMemory => {
                 log::info!("Using in-memory storage");
                 (
                     None,
                     Arc::new(InMemoryDocumentRepository::new()) as Arc<dyn DocumentRepository>,
                     Arc::new(InMemoryProjectRepository::new()) as Arc<dyn ProjectRepository>,
-                    ProjectFactory::create_repository(),
-                    VcFactory::create_repository(),
-                    AgentRepositoryFactory::create_agent_repository(),
                 )
             },
             StorageType::SQLite => {
@@ -314,22 +344,28 @@ impl CoreEngine {
                         None,
                         Arc::new(InMemoryDocumentRepository::new()) as Arc<dyn DocumentRepository>,
                         Arc::new(InMemoryProjectRepository::new()) as Arc<dyn ProjectRepository>,
-                        ProjectFactory::create_repository(),
-                        VcFactory::create_repository(),
-                        AgentRepositoryFactory::create_agent_repository(),
                     )
                 } else {
                     log::info!("Using SQLite storage at: {}", db_config.database_url);
                     let database_manager = DatabaseManager::new(db_config.clone()).await?;
                     let pool = database_manager.pool().clone();
-                    (
-                        Some(database_manager),
-                        Arc::new(SqliteDocumentRepository::new(pool.clone())) as Arc<dyn DocumentRepository>,
-                        Arc::new(SqliteProjectRepository::new(pool)) as Arc<dyn ProjectRepository>,
-                        ProjectFactory::create_repository(),
-                        VcFactory::create_repository(),
-                        AgentRepositoryFactory::create_agent_repository(),
-                    )
+                    #[cfg(feature = "database")]
+                    {
+                        (
+                            Some(database_manager),
+                            Arc::new(SqliteDocumentRepository::new(pool.clone())) as Arc<dyn DocumentRepository>,
+                            Arc::new(SqliteProjectRepository::new(pool)) as Arc<dyn ProjectRepository>,
+                        )
+                    }
+                    #[cfg(not(feature = "database"))]
+                    {
+                        let _ = pool; // Avoid unused variable warning
+                        (
+                            Some(database_manager),
+                            Arc::new(InMemoryDocumentRepository::new()) as Arc<dyn DocumentRepository>,
+                            Arc::new(InMemoryProjectRepository::new()) as Arc<dyn ProjectRepository>,
+                        )
+                    }
                 }
             },
             #[cfg(target_arch = "wasm32")]
@@ -341,19 +377,25 @@ impl CoreEngine {
         };
 
         // Initialize AI services
+        #[cfg(feature = "ai")]
         let (mut ai_orchestration_service, mut content_filtering_service) = Self::initialize_ai_services(&config.ai).await?;
         
         // Initialize context management service
-        let context_management_service = ContextManagementService::new(config.ai.max_context_length);
+        #[cfg(feature = "ai")]
+        let context_management_service = ContextManagementService::new(config.ai.max_context_length.try_into().unwrap())?;
 
-        // Initialize AI writing service if AI orchestration is available
+        // Create Arc for context management service
+        #[cfg(feature = "ai")]
+        let context_arc = Arc::new(context_management_service);
+        
+        // Initialize AI writing service if AI orchestration is available  
+        #[cfg(feature = "ai")]
         let ai_writing_service = if ai_orchestration_service.is_some() && content_filtering_service.is_some() {
             // Take ownership of the services
             let orchestration_arc = Arc::new(ai_orchestration_service.take().unwrap());
-            let context_arc = Arc::new(context_management_service.clone());
             let filter_arc = Arc::new(content_filtering_service.take().unwrap());
             
-            Some(AIWritingService::new(orchestration_arc, context_arc, filter_arc))
+            Some(AIWritingService::new(orchestration_arc, context_arc.clone(), filter_arc))
         } else {
             None
         };
@@ -368,51 +410,11 @@ impl CoreEngine {
         ));
         let content_analysis_service = Arc::new(ContentAnalysisService::new());
         
-        // Initialize new domain services
-        let project_domain_service = Arc::new(ProjectDomainService::new(
-            project_domain_repository.clone(),
-        ));
-        let project_template_service = Arc::new(ProjectTemplateService::new(
-            project_domain_repository.clone(),
-        ));
-        let project_analytics_service = Arc::new(ProjectAnalyticsService::new(
-            project_domain_repository.clone(),
-        ));
-        let version_control_service = Arc::new(VersionControlService::new(
-            version_control_repository.clone(),
-        ));
-        let diff_service = Arc::new(DiffService::new());
-        let timeline_service = Arc::new(TimelineService::new(
-            version_control_repository.clone(),
-        ));
-        
-        // Initialize agent services
-        let agent_workflow_repository = AgentRepositoryFactory::create_workflow_repository();
-        let agent_execution_repository = AgentRepositoryFactory::create_execution_repository();
-        
-        let agent_management_service = Arc::new(AgentManagementService::new(
-            agent_repository.clone(),
-            agent_workflow_repository.clone(),
-            agent_execution_repository.clone(),
-        ));
-        
-        let running_agents = Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
-        
-        let agent_execution_service = Arc::new(AgentExecutionService::new(
-            agent_repository.clone(),
-            agent_execution_repository.clone(),
-            running_agents.clone(),
-        ));
-        let agent_workflow_service = Arc::new(AgentWorkflowService::new(
-            agent_workflow_repository.clone(),
-        ));
-        let agent_orchestration_service = Arc::new(AgentOrchestrationService::new(
-            agent_management_service.clone(),
-            agent_execution_service.clone(),
-            agent_workflow_service.clone(),
-        ));
+        // TODO: Initialize additional domain services when implemented
+        // These services will be added in future phases when their dependencies are available
 
         // Initialize integrated writing service if AI is available
+        #[cfg(feature = "ai")]
         let integrated_writing_service = if let Some(ai_writing) = &ai_writing_service {
             let integrated = IntegratedWritingServiceBuilder::new()
                 .with_ai_writing_service(Arc::new(ai_writing.clone()))
@@ -427,14 +429,11 @@ impl CoreEngine {
             None
         };
         
-        // Initialize cross-domain coordination
-        let event_bus = Arc::new(InMemoryEventBus::new()) as Arc<dyn EventBus>;
-        let mut service_registry = CrossDomainServiceRegistry::new(event_bus.clone());
-        
-        // Register domain service adapters - these would need to be implemented
-        // For now, we'll create the structure without the actual adapters
-        let service_registry = Arc::new(service_registry);
-        let cross_domain_coordinator = Arc::new(CrossDomainCoordinator::new(service_registry.clone()));
+        // TODO: Initialize cross-domain coordination when dependencies are available
+        // let event_bus = Arc::new(InMemoryEventBus::new()) as Arc<dyn EventBus>;
+        // let mut service_registry = CrossDomainServiceRegistry::new(event_bus.clone());
+        // let service_registry = Arc::new(service_registry);
+        // let cross_domain_coordinator = Arc::new(CrossDomainCoordinator::new(service_registry.clone()));
 
         Ok(Self {
             config,
@@ -443,35 +442,25 @@ impl CoreEngine {
             indexeddb_manager: None,
             document_repository,
             project_repository,
-            project_domain_repository,
-            version_control_repository,
-            agent_repository,
+            #[cfg(feature = "ai")]
             ai_orchestration_service,
-            context_management_service,
+            #[cfg(feature = "ai")]
+            context_management_service: (*context_arc).clone(),
+            #[cfg(feature = "ai")]
             content_filtering_service,
+            #[cfg(feature = "ai")]
             ai_writing_service,
             document_management_service,
             project_management_service,
             content_analysis_service,
+            #[cfg(feature = "ai")]
             integrated_writing_service,
-            project_domain_service,
-            project_template_service,
-            project_analytics_service,
-            version_control_service,
-            diff_service,
-            timeline_service,
-            agent_management_service,
-            agent_execution_service,
-            agent_workflow_service,
-            agent_orchestration_service,
-            event_bus,
-            service_registry,
-            cross_domain_coordinator,
             tokio_runtime,
         })
     }
 
     /// Initialize AI services based on configuration
+    #[cfg(feature = "ai")]
     async fn initialize_ai_services(ai_config: &AIConfig) -> Result<(Option<AIOrchestrationService>, Option<ContentFilteringService>)> {
         let mut ai_service = None;
         let mut content_filter = None;
@@ -480,19 +469,19 @@ impl CoreEngine {
         if ai_config.claude_api_key.is_some() || ai_config.openai_api_key.is_some() {
             log::info!("Initializing AI orchestration service");
             
-            let mut registry = AIProviderRegistry::new();
+            let registry = AIProviderRegistry::new();
             
             if let Some(claude_key) = &ai_config.claude_api_key {
-                registry = registry.with_claude_key(claude_key.clone());
+                registry.add_claude_key(claude_key.clone())?;
                 log::info!("Claude provider configured");
             }
             
             if let Some(openai_key) = &ai_config.openai_api_key {
-                registry = registry.with_openai_key(openai_key.clone());
+                registry.add_openai_key(openai_key.clone())?;
                 log::info!("OpenAI provider configured");
             }
             
-            ai_service = Some(registry.create_orchestration_service()?);
+            ai_service = Some(registry.create_orchestration_service().await?);
         } else {
             log::warn!("No AI API keys configured - AI features will be disabled");
         }
@@ -507,6 +496,7 @@ impl CoreEngine {
     }
 
     /// Initialize the core engine with legacy configuration (backwards compatibility)
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn new(config: CoreEngineConfig) -> Result<Self> {
         let app_config = ApplicationConfig {
             database: config.database_config.unwrap_or_else(|| {
@@ -522,6 +512,17 @@ impl CoreEngine {
                     DatabaseConfig::default()
                 }
             }),
+            storage: if config.use_in_memory {
+                StorageConfig {
+                    storage_type: StorageType::InMemory,
+                    database_config: None,
+                    #[cfg(target_arch = "wasm32")]
+                    indexeddb_config: None,
+                }
+            } else {
+                StorageConfig::default()
+            },
+            #[cfg(feature = "ai")]
             ai: AIConfig::default(),
             logging: LoggingConfig::default(),
             security: SecurityConfig::default(),
@@ -535,6 +536,11 @@ impl CoreEngine {
         Self::new(CoreEngineConfig::sqlite()).await
     }
 
+    /// Initialize the core engine with default configuration (web handler compatibility)
+    pub async fn initialize() -> Result<Self> {
+        Self::new_default().await
+    }
+
     /// Create engine with in-memory storage for testing
     pub async fn new_in_memory() -> Result<Self> {
         Self::new(CoreEngineConfig::in_memory()).await
@@ -546,6 +552,7 @@ impl CoreEngine {
     }
 
     /// Create engine with full configuration including AI providers
+    #[cfg(feature = "ai")]
     pub async fn new_with_ai(claude_key: Option<String>, openai_key: Option<String>) -> Result<Self> {
         let mut ai_config = AIConfig::default();
         ai_config.claude_api_key = claude_key;
@@ -563,6 +570,7 @@ impl CoreEngine {
     }
 
     /// Create engine with in-memory storage and AI providers  
+    #[cfg(feature = "ai")]
     pub async fn new_in_memory_with_ai(claude_key: Option<String>, openai_key: Option<String>) -> Result<Self> {
         let mut ai_config = AIConfig::default();
         ai_config.claude_api_key = claude_key;
@@ -628,22 +636,28 @@ impl CoreEngine {
         log::info!("IndexedDB repositories initialized");
         
         // Initialize AI services
+        #[cfg(feature = "ai")]
         let (mut ai_orchestration_service, mut content_filtering_service) = Self::initialize_ai_services(&config.ai).await?;
         
         // Initialize context management service
-        let context_management_service = ContextManagementService::new(config.ai.max_context_length);
+        #[cfg(feature = "ai")]
+        let context_management_service = ContextManagementService::new(config.ai.max_context_length.try_into().unwrap())?;
         
         // Initialize AI writing service if AI orchestration is available
+        #[cfg(feature = "ai")]
         let ai_writing_service = if ai_orchestration_service.is_some() && content_filtering_service.is_some() {
             // Take ownership of the services
             let orchestration_arc = Arc::new(ai_orchestration_service.take().unwrap());
-            let context_arc = Arc::new(context_management_service.clone());
+            let context_arc = Arc::new(context_management_service);
             let filter_arc = Arc::new(content_filtering_service.take().unwrap());
             
             Some(AIWritingService::new(orchestration_arc, context_arc, filter_arc))
         } else {
             None
         };
+        
+        #[cfg(not(feature = "ai"))]
+        let ai_writing_service = None;
         
         // Initialize domain services
         let document_management_service = Arc::new(DocumentManagementService::new(
@@ -655,51 +669,11 @@ impl CoreEngine {
         ));
         let content_analysis_service = Arc::new(ContentAnalysisService::new());
         
-        // Initialize new domain services
-        let project_domain_service = Arc::new(ProjectDomainService::new(
-            project_domain_repository.clone(),
-        ));
-        let project_template_service = Arc::new(ProjectTemplateService::new(
-            project_domain_repository.clone(),
-        ));
-        let project_analytics_service = Arc::new(ProjectAnalyticsService::new(
-            project_domain_repository.clone(),
-        ));
-        let version_control_service = Arc::new(VersionControlService::new(
-            version_control_repository.clone(),
-        ));
-        let diff_service = Arc::new(DiffService::new());
-        let timeline_service = Arc::new(TimelineService::new(
-            version_control_repository.clone(),
-        ));
-        
-        // Initialize agent services
-        let agent_workflow_repository = AgentRepositoryFactory::create_workflow_repository();
-        let agent_execution_repository = AgentRepositoryFactory::create_execution_repository();
-        
-        let agent_management_service = Arc::new(AgentManagementService::new(
-            agent_repository.clone(),
-            agent_workflow_repository.clone(),
-            agent_execution_repository.clone(),
-        ));
-        
-        let running_agents = Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
-        
-        let agent_execution_service = Arc::new(AgentExecutionService::new(
-            agent_repository.clone(),
-            agent_execution_repository.clone(),
-            running_agents.clone(),
-        ));
-        let agent_workflow_service = Arc::new(AgentWorkflowService::new(
-            agent_workflow_repository.clone(),
-        ));
-        let agent_orchestration_service = Arc::new(AgentOrchestrationService::new(
-            agent_management_service.clone(),
-            agent_execution_service.clone(),
-            agent_workflow_service.clone(),
-        ));
+        // TODO: Initialize additional domain services when implemented
+        // These services will be added in future phases when their dependencies are available
         
         // Initialize integrated writing service if AI is available
+        #[cfg(feature = "ai")]
         let integrated_writing_service = if let Some(ai_writing) = &ai_writing_service {
             let integrated = IntegratedWritingServiceBuilder::new()
                 .with_ai_writing_service(Arc::new(ai_writing.clone()))
@@ -729,30 +703,19 @@ impl CoreEngine {
             indexeddb_manager: Some(indexeddb_manager),
             document_repository,
             project_repository,
-            project_domain_repository,
-            version_control_repository,
-            agent_repository,
+            #[cfg(feature = "ai")]
             ai_orchestration_service,
-            context_management_service,
+            #[cfg(feature = "ai")]
+            context_management_service: (*context_arc).clone(),
+            #[cfg(feature = "ai")]
             content_filtering_service,
+            #[cfg(feature = "ai")]
             ai_writing_service,
             document_management_service,
             project_management_service,
             content_analysis_service,
+            #[cfg(feature = "ai")]
             integrated_writing_service,
-            project_domain_service,
-            project_template_service,
-            project_analytics_service,
-            version_control_service,
-            diff_service,
-            timeline_service,
-            agent_management_service,
-            agent_execution_service,
-            agent_workflow_service,
-            agent_orchestration_service,
-            event_bus,
-            service_registry,
-            cross_domain_coordinator,
             tokio_runtime,
         })
     }
@@ -765,7 +728,7 @@ impl CoreEngine {
     }
     
     /// Create engine with IndexedDB and AI providers for WASM
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(all(target_arch = "wasm32", feature = "ai"))]
     pub async fn new_indexeddb_with_ai(claude_key: Option<String>, openai_key: Option<String>) -> Result<Self> {
         let mut ai_config = AIConfig::default();
         ai_config.claude_api_key = claude_key;
@@ -790,6 +753,7 @@ impl CoreEngine {
 
     // Database access methods
     /// Get database manager (if using SQLite)
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn database_manager(&self) -> Option<&DatabaseManager> {
         self.database_manager.as_ref()
     }
@@ -817,21 +781,25 @@ impl CoreEngine {
     }
 
     // AI service access methods
+    #[cfg(feature = "ai")]
     /// Get AI orchestration service
     pub fn ai_orchestration_service(&self) -> Option<&AIOrchestrationService> {
         self.ai_orchestration_service.as_ref()
     }
 
+    #[cfg(feature = "ai")]
     /// Get context management service
     pub fn context_management_service(&self) -> &ContextManagementService {
         &self.context_management_service
     }
 
+    #[cfg(feature = "ai")]
     /// Get content filtering service
     pub fn content_filtering_service(&self) -> Option<&ContentFilteringService> {
         self.content_filtering_service.as_ref()
     }
 
+    #[cfg(feature = "ai")]
     /// Get AI writing service
     pub fn ai_writing_service(&self) -> Option<&AIWritingService> {
         self.ai_writing_service.as_ref()
@@ -853,93 +821,99 @@ impl CoreEngine {
         self.content_analysis_service.clone()
     }
 
+
     /// Get integrated writing service
+    #[cfg(feature = "ai")]
     pub fn integrated_writing_service(&self) -> Option<Arc<IntegratedWritingService>> {
         self.integrated_writing_service.clone()
     }
 
     // New domain service access methods
     /// Get project domain service (advanced project management)
-    pub fn project_domain_service(&self) -> Arc<ProjectDomainService> {
-        self.project_domain_service.clone()
-    }
+    // TODO: Uncomment when dependencies are available
+    // pub fn project_domain_service(&self) -> Arc<ProjectDomainService> {
+    //     self.project_domain_service.clone()
+    // }
 
-    /// Get project template service
-    pub fn project_template_service(&self) -> Arc<ProjectTemplateService> {
-        self.project_template_service.clone()
-    }
+    // TODO: Uncomment when dependencies are available
+    // /// Get project template service
+    // pub fn project_template_service(&self) -> Arc<ProjectTemplateService> {
+    //     self.project_template_service.clone()
+    // }
 
-    /// Get project analytics service
-    pub fn project_analytics_service(&self) -> Arc<ProjectAnalyticsService> {
-        self.project_analytics_service.clone()
-    }
+    // /// Get project analytics service
+    // pub fn project_analytics_service(&self) -> Arc<ProjectAnalyticsService> {
+    //     self.project_analytics_service.clone()
+    // }
 
-    /// Get version control service
-    pub fn version_control_service(&self) -> Arc<VersionControlService> {
-        self.version_control_service.clone()
-    }
+    // TODO: Uncomment when dependencies are available
+    // /// Get version control service
+    // pub fn version_control_service(&self) -> Arc<VersionControlService> {
+    //     self.version_control_service.clone()
+    // }
 
-    /// Get diff service
-    pub fn diff_service(&self) -> Arc<DiffService> {
-        self.diff_service.clone()
-    }
+    // TODO: Uncomment when dependencies are available
+    // /// Get diff service
+    // pub fn diff_service(&self) -> Arc<DiffService> {
+    //     self.diff_service.clone()
+    // }
 
-    /// Get timeline service
-    pub fn timeline_service(&self) -> Arc<TimelineService> {
-        self.timeline_service.clone()
-    }
+    // /// Get timeline service
+    // pub fn timeline_service(&self) -> Arc<TimelineService> {
+    //     self.timeline_service.clone()
+    // }
 
-    /// Get agent management service
-    pub fn agent_management_service(&self) -> Arc<AgentManagementService> {
-        self.agent_management_service.clone()
-    }
+    // /// Get agent management service
+    // pub fn agent_management_service(&self) -> Arc<AgentManagementService> {
+    //     self.agent_management_service.clone()
+    // }
 
-    /// Get agent execution service
-    pub fn agent_execution_service(&self) -> Arc<AgentExecutionService> {
-        self.agent_execution_service.clone()
-    }
+    // /// Get agent execution service
+    // pub fn agent_execution_service(&self) -> Arc<AgentExecutionService> {
+    //     self.agent_execution_service.clone()
+    // }
 
-    /// Get agent workflow service
-    pub fn agent_workflow_service(&self) -> Arc<AgentWorkflowService> {
-        self.agent_workflow_service.clone()
-    }
+    // /// Get agent workflow service
+    // pub fn agent_workflow_service(&self) -> Arc<AgentWorkflowService> {
+    //     self.agent_workflow_service.clone()
+    // }
 
-    /// Get agent orchestration service
-    pub fn agent_orchestration_service(&self) -> Arc<AgentOrchestrationService> {
-        self.agent_orchestration_service.clone()
-    }
+    // /// Get agent orchestration service
+    // pub fn agent_orchestration_service(&self) -> Arc<AgentOrchestrationService> {
+    //     self.agent_orchestration_service.clone()
+    // }
 
-    // New domain repository access methods
-    /// Get project domain repository
-    pub fn project_domain_repository(&self) -> Arc<dyn ProjectDomainRepository> {
-        self.project_domain_repository.clone()
-    }
+    // // New domain repository access methods
+    // /// Get project domain repository
+    // pub fn project_domain_repository(&self) -> Arc<dyn ProjectDomainRepository> {
+    //     self.project_domain_repository.clone()
+    // }
 
-    /// Get version control repository
-    pub fn version_control_repository(&self) -> Arc<dyn VersionControlRepository> {
-        self.version_control_repository.clone()
-    }
+    // /// Get version control repository
+    // pub fn version_control_repository(&self) -> Arc<dyn VersionControlRepository> {
+    //     self.version_control_repository.clone()
+    // }
 
-    /// Get agent repository
-    pub fn agent_repository(&self) -> Arc<dyn AgentRepository> {
-        self.agent_repository.clone()
-    }
+    // /// Get agent repository
+    // pub fn agent_repository(&self) -> Arc<dyn AgentRepository> {
+    //     self.agent_repository.clone()
+    // }
 
-    // Configuration access methods
-    /// Get event bus
-    pub fn event_bus(&self) -> Arc<dyn EventBus> {
-        self.event_bus.clone()
-    }
+    // // Configuration access methods
+    // /// Get event bus
+    // pub fn event_bus(&self) -> Arc<dyn EventBus> {
+    //     self.event_bus.clone()
+    // }
 
-    /// Get cross-domain service registry
-    pub fn service_registry(&self) -> Arc<CrossDomainServiceRegistry> {
-        self.service_registry.clone()
-    }
+    // /// Get cross-domain service registry
+    // pub fn service_registry(&self) -> Arc<CrossDomainServiceRegistry> {
+    //     self.service_registry.clone()
+    // }
 
-    /// Get cross-domain coordinator
-    pub fn cross_domain_coordinator(&self) -> Arc<CrossDomainCoordinator> {
-        self.cross_domain_coordinator.clone()
-    }
+    // /// Get cross-domain coordinator
+    // pub fn cross_domain_coordinator(&self) -> Arc<CrossDomainCoordinator> {
+    //     self.cross_domain_coordinator.clone()
+    // }
 
     /// Get application configuration
     pub fn config(&self) -> &ApplicationConfig {
@@ -953,6 +927,7 @@ impl CoreEngine {
 
     // AI integration methods
     /// Complete text using AI with automatic provider fallback
+    #[cfg(feature = "ai")]
     pub async fn complete_text(&self, prompt: String, model: Option<String>) -> Result<String> {
         match &self.ai_orchestration_service {
             Some(ai_service) => {
@@ -987,6 +962,7 @@ impl CoreEngine {
     }
 
     /// Check AI provider health status
+    #[cfg(feature = "ai")]
     pub async fn check_ai_provider_health(&self) -> Result<HashMap<String, bool>> {
         match &self.ai_orchestration_service {
             Some(ai_service) => {
@@ -997,6 +973,7 @@ impl CoreEngine {
     }
 
     /// Get AI provider statistics
+    #[cfg(feature = "ai")]
     pub async fn get_ai_provider_stats(&self) -> Result<HashMap<String, serde_json::Value>> {
         match &self.ai_orchestration_service {
             Some(ai_service) => {
@@ -1018,6 +995,7 @@ impl CoreEngine {
     }
 
     /// Get migration status (if using SQLite)
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_migration_status(&self) -> Result<Option<Vec<writemagic_shared::MigrationStatus>>> {
         if let Some(db_manager) = &self.database_manager {
             Ok(Some(db_manager.get_migration_status().await?))
@@ -1060,7 +1038,7 @@ impl CoreEngine {
             );
         }
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(all(not(target_os = "android"), not(target_arch = "wasm32")))]
         {
             env_logger::Builder::from_default_env()
                 .filter_level(level)
@@ -1082,6 +1060,7 @@ impl CoreEngine {
         let mut issues = Vec::new();
         
         // Validate AI configuration
+        #[cfg(feature = "ai")]
         if self.config.ai.claude_api_key.is_none() && self.config.ai.openai_api_key.is_none() {
             issues.push("No AI API keys configured - AI features will be disabled".to_string());
         }
@@ -1114,6 +1093,7 @@ impl ApplicationConfigBuilder {
     }
 
     /// Set database configuration
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn with_database_config(mut self, database_config: DatabaseConfig) -> Self {
         self.config.database = database_config;
         self
@@ -1121,11 +1101,13 @@ impl ApplicationConfigBuilder {
 
     /// Use SQLite with default settings
     pub fn with_sqlite(mut self) -> Self {
-        self.config.database = DatabaseConfig::default();
+        #[cfg(not(target_arch = "wasm32"))]
+        { self.config.database = DatabaseConfig::default(); }
         self
     }
 
     /// Use SQLite in-memory database
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn with_sqlite_in_memory(mut self) -> Self {
         self.config.database = DatabaseConfig {
             database_url: "sqlite::memory:".to_string(),
@@ -1138,36 +1120,42 @@ impl ApplicationConfigBuilder {
     }
 
     /// Set AI configuration
+    #[cfg(feature = "ai")]
     pub fn with_ai_config(mut self, ai_config: AIConfig) -> Self {
         self.config.ai = ai_config;
         self
     }
 
     /// Configure Claude API key
+    #[cfg(feature = "ai")]
     pub fn with_claude_key(mut self, api_key: String) -> Self {
         self.config.ai.claude_api_key = Some(api_key);
         self
     }
 
     /// Configure OpenAI API key  
+    #[cfg(feature = "ai")]
     pub fn with_openai_key(mut self, api_key: String) -> Self {
         self.config.ai.openai_api_key = Some(api_key);
         self
     }
 
     /// Set default AI model
+    #[cfg(feature = "ai")]
     pub fn with_default_model(mut self, model: String) -> Self {
         self.config.ai.default_model = model;
         self
     }
 
     /// Set maximum context length for AI
+    #[cfg(feature = "ai")]
     pub fn with_max_context_length(mut self, length: usize) -> Self {
         self.config.ai.max_context_length = length;
         self
     }
 
     /// Enable or disable content filtering
+    #[cfg(feature = "ai")]
     pub fn with_content_filtering(mut self, enabled: bool) -> Self {
         self.config.ai.enable_content_filtering = enabled;
         self
@@ -1243,11 +1231,13 @@ impl CoreEngineBuilder {
     /// Use SQLite with default configuration
     pub fn with_sqlite(mut self) -> Self {
         self.config.use_in_memory = false;
-        self.config.database_config = Some(DatabaseConfig::default());
+        #[cfg(not(target_arch = "wasm32"))]
+        { self.config.database_config = Some(DatabaseConfig::default()); }
         self
     }
 
     /// Use SQLite with custom configuration
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn with_sqlite_config(mut self, config: DatabaseConfig) -> Self {
         self.config.use_in_memory = false;
         self.config.database_config = Some(config);
@@ -1255,6 +1245,7 @@ impl CoreEngineBuilder {
     }
 
     /// Use SQLite in-memory database
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn with_sqlite_in_memory(mut self) -> Self {
         self.config.use_in_memory = false;
         self.config.database_config = Some(DatabaseConfig {
@@ -1416,8 +1407,9 @@ pub mod wasm_bindings {
                 
                 // Convert the context to the required format for agent execution
                 // This is a simplified conversion - in practice you'd have more sophisticated context handling
-                let trigger_type = writemagic_agent::TriggerType::Manual;
-                let strategy = writemagic_agent::ExecutionStrategy::Immediate;
+                // TODO: Agent integration - placeholder for future implementation
+                let trigger_type = TriggerType::Manual;
+                let strategy = ExecutionStrategy::Immediate;
                 let context_json: std::collections::BTreeMap<String, serde_json::Value> = context_map
                     .into_iter()
                     .map(|(k, v)| (k, serde_json::Value::String(v)))
@@ -1545,7 +1537,7 @@ pub mod wasm_bindings {
 mod tests {
     use super::*;
     use writemagic_shared::Pagination;
-    use writemagic_writing::entities::{Document, Project};
+    use crate::entities::{Document, Project};
     use writemagic_shared::{ContentType, EntityId};
 
     #[tokio::test]
@@ -1729,7 +1721,7 @@ mod tests {
             writemagic_ai::Message::user("User message"),
         ];
         
-        let managed_context = context_service.manage_context(messages.clone());
+        let managed_context = context_service.manage_context(messages.clone(), "test-model").expect("Failed to manage context");
         assert_eq!(managed_context.len(), 2);
     }
 

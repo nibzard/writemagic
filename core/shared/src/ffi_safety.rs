@@ -122,13 +122,13 @@ pub struct FFIHandle<T> {
 
 const MAGIC_NUMBER: u32 = 0xDEADBEEF;
 
-impl<T> FFIHandle<T> {
+impl<T: 'static> FFIHandle<T> {
     /// Create a new FFI handle from a boxed value
     pub fn new(value: T) -> Self {
         let boxed = Box::new(value);
         Self {
             inner: Box::into_raw(boxed),
-            type_id: std::any::TypeId::of::<T>().into(), // Convert TypeId to u64
+            type_id: TypeIdExt::into(std::any::TypeId::of::<T>()), // Convert TypeId to u64
             magic: MAGIC_NUMBER,
         }
     }
@@ -161,7 +161,7 @@ impl<T> FFIHandle<T> {
             return Err(FFIError::NullPointer);
         }
 
-        if self.type_id != std::any::TypeId::of::<T>().into() {
+        if self.type_id != TypeIdExt::into(std::any::TypeId::of::<T>()) {
             return Err(FFIError::InvalidInput("Handle type mismatch".to_string()));
         }
 
@@ -262,6 +262,12 @@ macro_rules! ffi_wrapper {
 /// Thread-safe singleton for FFI state management
 pub struct FFISingleton<T> {
     value: std::sync::OnceLock<T>,
+}
+
+impl<T> Default for FFISingleton<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T> FFISingleton<T> {

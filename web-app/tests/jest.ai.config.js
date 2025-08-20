@@ -3,13 +3,16 @@ module.exports = {
   testEnvironment: 'jsdom',
   testMatch: ['<rootDir>/ai/**/*.test.js'],
   setupFilesAfterEnv: ['<rootDir>/setup/jest.setup.js'],
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/../src/js/$1',
     '^@public/(.*)$': '<rootDir>/../public/$1'
   },
+  transform: {
+    '^.+\\.js$': ['babel-jest', { presets: [['@babel/preset-env', { targets: { node: 'current' } }]] }]
+  },
+  extensionsToTreatAsEsm: ['.js'],
   testTimeout: 30000, // AI tests may take longer
   collectCoverageFrom: [
-    '../src/js/ai-proxy-integration.js',
     '../src/js/writing-session.js'
   ],
   coverageDirectory: '<rootDir>/coverage/ai',

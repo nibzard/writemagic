@@ -79,6 +79,19 @@ impl ModelConfiguration {
 
 impl ValueObject for ModelConfiguration {}
 
+impl Default for ModelConfiguration {
+    fn default() -> Self {
+        Self {
+            model_name: "claude-3-5-sonnet-20241022".to_string(),
+            max_tokens: 4096,
+            temperature: 0.7,
+            top_p: 1.0,
+            frequency_penalty: 0.0,
+            presence_penalty: 0.0,
+        }
+    }
+}
+
 /// Token count value object
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TokenCount(pub u32);

@@ -6,10 +6,10 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, closure::Closure};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::*;
-use js_sys::{Array, Object, Reflect};
+use js_sys::{Array, Object, Reflect, Promise};
 
 use writemagic_shared::{EntityId, Pagination, Repository, Result as SharedResult, WritemagicError, ContentType};
 use crate::entities::{Document, Project};
@@ -19,6 +19,27 @@ use super::indexeddb_manager::IndexedDbManager;
 use super::schema::{ObjectStore, SearchConfig};
 use super::serialization::{IndexedDbDocument, IndexedDbProject, IndexedDbProjectDocument, BatchOperation, BatchOperationType};
 use super::{IndexedDbError, Result, js_error_to_indexeddb_error};
+
+/// Helper function to convert IdbRequest to Promise for JsFuture
+fn request_to_promise(request: IdbRequest) -> Promise {
+    Promise::new(&mut |resolve, reject| {
+        let request_clone = request.clone();
+        let success_closure = Closure::wrap(Box::new(move |_event: Event| {
+            resolve.call1(&JsValue::NULL, &request_clone.result().unwrap_or(JsValue::NULL)).unwrap();
+        }) as Box<dyn FnMut(_)>);
+        
+        let request_clone2 = request.clone();
+        let error_closure = Closure::wrap(Box::new(move |_event: Event| {
+            reject.call1(&JsValue::NULL, &request_clone2.error().unwrap_or(JsValue::NULL)).unwrap();
+        }) as Box<dyn FnMut(_)>);
+        
+        request.set_onsuccess(Some(success_closure.as_ref().unchecked_ref()));
+        request.set_onerror(Some(error_closure.as_ref().unchecked_ref()));
+        
+        success_closure.forget();
+        error_closure.forget();
+    })
+}
 
 /// IndexedDB implementation of DocumentRepository
 pub struct IndexedDbDocumentRepository {
@@ -54,7 +75,7 @@ impl IndexedDbDocumentRepository {
                     let request = store.add(&js_doc)
                         .map_err(|e| js_error_to_indexeddb_error(&e, "Batch insert"))?;
                     
-                    JsFuture::from(request).await
+                    JsFuture::from(request_to_promise(request)).await
                         .map_err(|e| js_error_to_indexeddb_error(&e, "Batch insert completion"))?;
                     
                     results.push(doc.try_into()?);
@@ -64,7 +85,7 @@ impl IndexedDbDocumentRepository {
                     let request = store.put(&js_doc)
                         .map_err(|e| js_error_to_indexeddb_error(&e, "Batch update"))?;
                     
-                    JsFuture::from(request).await
+                    JsFuture::from(request_to_promise(request)).await
                         .map_err(|e| js_error_to_indexeddb_error(&e, "Batch update completion"))?;
                     
                     results.push(doc.try_into()?);
@@ -73,7 +94,7 @@ impl IndexedDbDocumentRepository {
                     let request = store.delete(&JsValue::from_str(&id))
                         .map_err(|e| js_error_to_indexeddb_error(&e, "Batch delete"))?;
                     
-                    JsFuture::from(request).await
+                    JsFuture::from(request_to_promise(request)).await
                         .map_err(|e| js_error_to_indexeddb_error(&e, "Batch delete completion"))?;
                 }
             }
@@ -99,7 +120,7 @@ impl IndexedDbDocumentRepository {
         let request = store.get_all()
             .map_err(|e| js_error_to_indexeddb_error(&e, "Getting all documents for search"))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| js_error_to_indexeddb_error(&e, "Search documents completion"))?;
         
         let array = Array::from(&result);
@@ -174,7 +195,7 @@ impl IndexedDbDocumentRepository {
         let request = index.get_all_with_key(key)
             .map_err(|e| js_error_to_indexeddb_error(&e, &format!("Querying index {}", index_name)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| js_error_to_indexeddb_error(&e, &format!("Index query completion for {}", index_name)))?;
         
         let array = Array::from(&result);
@@ -204,7 +225,7 @@ impl IndexedDbDocumentRepository {
         let request = store.get_all()
             .map_err(|e| js_error_to_indexeddb_error(&e, "Getting all documents for counting"))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| js_error_to_indexeddb_error(&e, "Count documents completion"))?;
         
         let array = Array::from(&result);
@@ -233,7 +254,7 @@ impl Repository<Document, EntityId> for IndexedDbDocumentRepository {
         let request = store.get(&JsValue::from_str(&id.to_string()))
             .map_err(|e| WritemagicError::database(&format!("Find by ID failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Find by ID completion failed: {:?}", e)))?;
         
         if result.is_undefined() || result.is_null() {
@@ -269,14 +290,14 @@ impl Repository<Document, EntityId> for IndexedDbDocumentRepository {
         let mut collected = 0;
         
         // This is a simplified cursor handling - in practice, you'd need more complex async cursor iteration
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Cursor operation failed: {:?}", e)))?;
         
         // For now, use get_all and handle pagination manually
         let request = store.get_all()
             .map_err(|e| WritemagicError::database(&format!("Get all documents failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Get all completion failed: {:?}", e)))?;
         
         let array = Array::from(&result);
@@ -321,7 +342,7 @@ impl Repository<Document, EntityId> for IndexedDbDocumentRepository {
         let request = store.put(&js_doc)
             .map_err(|e| WritemagicError::database(&format!("Save document failed: {:?}", e)))?;
         
-        JsFuture::from(request).await
+        JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Save completion failed: {:?}", e)))?;
         
         manager.execute_transaction(transaction).await
@@ -384,7 +405,7 @@ impl DocumentRepository for IndexedDbDocumentRepository {
         let request = index.get_all_with_key(&JsValue::from_str(&project_id.to_string()))
             .map_err(|e| WritemagicError::database(&format!("Query project documents failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Project documents query completion failed: {:?}", e)))?;
         
         let relationships_array = Array::from(&result);
@@ -412,7 +433,7 @@ impl DocumentRepository for IndexedDbDocumentRepository {
             let request = documents_store.get(&JsValue::from_str(&doc_id))
                 .map_err(|e| WritemagicError::database(&format!("Get document failed: {:?}", e)))?;
             
-            let result = JsFuture::from(request).await
+            let result = JsFuture::from(request_to_promise(request)).await
                 .map_err(|e| WritemagicError::database(&format!("Get document completion failed: {:?}", e)))?;
             
             if !result.is_undefined() && !result.is_null() {
@@ -446,7 +467,7 @@ impl DocumentRepository for IndexedDbDocumentRepository {
         let request = store.get_all()
             .map_err(|e| WritemagicError::database(&format!("Get all for title search failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Title search completion failed: {:?}", e)))?;
         
         let array = Array::from(&result);
@@ -511,7 +532,7 @@ impl DocumentRepository for IndexedDbDocumentRepository {
         let request = store.get_all()
             .map_err(|e| WritemagicError::database(&format!("Get all for deleted search failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Deleted search completion failed: {:?}", e)))?;
         
         let array = Array::from(&result);
@@ -558,7 +579,7 @@ impl DocumentRepository for IndexedDbDocumentRepository {
         let request = store.get_all()
             .map_err(|e| WritemagicError::database(&format!("Get all for statistics failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Statistics query completion failed: {:?}", e)))?;
         
         let array = Array::from(&result);
@@ -632,7 +653,7 @@ impl IndexedDbProjectRepository {
         let request = store.add(&js_rel)
             .map_err(|e| WritemagicError::database(&format!("Add project document relationship failed: {:?}", e)))?;
         
-        JsFuture::from(request).await
+        JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Add relationship completion failed: {:?}", e)))?;
         
         manager.execute_transaction(transaction).await
@@ -652,7 +673,7 @@ impl IndexedDbProjectRepository {
         let request = store.delete(&JsValue::from_str(&composite_key))
             .map_err(|e| WritemagicError::database(&format!("Remove project document relationship failed: {:?}", e)))?;
         
-        JsFuture::from(request).await
+        JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Remove relationship completion failed: {:?}", e)))?;
         
         manager.execute_transaction(transaction).await
@@ -673,7 +694,7 @@ impl IndexedDbProjectRepository {
         let request = index.get_all_with_key(&JsValue::from_str(&project_id.to_string()))
             .map_err(|e| js_error_to_indexeddb_error(&e, "Query project documents"))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| js_error_to_indexeddb_error(&e, "Project documents query completion"))?;
         
         let array = Array::from(&result);
@@ -708,7 +729,7 @@ impl Repository<Project, EntityId> for IndexedDbProjectRepository {
         let request = store.get(&JsValue::from_str(&id.to_string()))
             .map_err(|e| WritemagicError::database(&format!("Find project by ID failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Find project completion failed: {:?}", e)))?;
         
         if result.is_undefined() || result.is_null() {
@@ -736,7 +757,7 @@ impl Repository<Project, EntityId> for IndexedDbProjectRepository {
         let request = store.get_all()
             .map_err(|e| WritemagicError::database(&format!("Get all projects failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Get all projects completion failed: {:?}", e)))?;
         
         let array = Array::from(&result);
@@ -898,7 +919,7 @@ impl Repository<Project, EntityId> for IndexedDbProjectRepository {
         let request = store.get_all()
             .map_err(|e| WritemagicError::database(&format!("Get all for count failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Count completion failed: {:?}", e)))?;
         
         let array = Array::from(&result);
@@ -931,7 +952,7 @@ impl ProjectRepository for IndexedDbProjectRepository {
         let request = index.get_all_with_key(&JsValue::from_str(&user_id.to_string()))
             .map_err(|e| WritemagicError::database(&format!("Query by creator failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Query by creator completion failed: {:?}", e)))?;
         
         let array = Array::from(&result);
@@ -976,7 +997,7 @@ impl ProjectRepository for IndexedDbProjectRepository {
         let request = store.get_all()
             .map_err(|e| WritemagicError::database(&format!("Get all for name search failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Name search completion failed: {:?}", e)))?;
         
         let array = Array::from(&result);
@@ -1034,7 +1055,7 @@ impl ProjectRepository for IndexedDbProjectRepository {
         let request = index.get_all_with_key(&JsValue::from_str(&document_id.to_string()))
             .map_err(|e| WritemagicError::database(&format!("Query containing document failed: {:?}", e)))?;
         
-        let result = JsFuture::from(request).await
+        let result = JsFuture::from(request_to_promise(request)).await
             .map_err(|e| WritemagicError::database(&format!("Containing document query completion failed: {:?}", e)))?;
         
         let relationships_array = Array::from(&result);

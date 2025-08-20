@@ -1,9 +1,9 @@
 //! Writing domain services
 
-use async_trait::async_trait;
-use writemagic_shared::{EntityId, DomainService, Result, WritemagicError};
+// Remove unused async_trait import
+use writemagic_shared::{EntityId, Result, WritemagicError};
 use crate::aggregates::{DocumentAggregate, ProjectAggregate};
-use crate::entities::{Document, Project};
+// Remove unused entity imports
 use crate::value_objects::{DocumentTitle, DocumentContent, ProjectName, TextSelection};
 use crate::repositories::{DocumentRepository, ProjectRepository};
 use std::sync::Arc;
@@ -18,6 +18,64 @@ impl DocumentManagementService {
         Self {
             document_repository,
         }
+    }
+
+    /// Get a document by ID - web handler compatibility method
+    pub async fn get_document(&self, document_id: &EntityId) -> Result<Option<DocumentAggregate>> {
+        match self.document_repository.find_by_id(document_id).await? {
+            Some(document) => Ok(Some(DocumentAggregate::load_from_document(document))),
+            None => Ok(None),
+        }
+    }
+
+    /// List documents with pagination - web handler compatibility method
+    pub async fn list_documents(&self, pagination: writemagic_shared::Pagination) -> Result<Vec<DocumentAggregate>> {
+        let documents = self.document_repository.find_all(pagination).await?;
+        Ok(documents.into_iter().map(DocumentAggregate::load_from_document).collect())
+    }
+
+    /// List documents by creator with pagination
+    pub async fn list_documents_by_creator(&self, creator_id: &EntityId, pagination: writemagic_shared::Pagination) -> Result<Vec<DocumentAggregate>> {
+        let documents = self.document_repository.find_by_creator(creator_id, pagination).await?;
+        Ok(documents.into_iter().map(DocumentAggregate::load_from_document).collect())
+    }
+
+    /// Update a full document - web handler compatibility method
+    pub async fn update_document(
+        &self,
+        document_id: EntityId,
+        title: Option<DocumentTitle>,
+        content: Option<DocumentContent>,
+        updated_by: Option<EntityId>,
+    ) -> Result<DocumentAggregate> {
+        // Load existing document
+        let document = self.document_repository
+            .find_by_id(&document_id)
+            .await?
+            .ok_or_else(|| WritemagicError::repository("Document not found"))?;
+
+        // Create aggregate
+        let mut aggregate = DocumentAggregate::load_from_document(document);
+
+        // Update title if provided
+        if let Some(new_title) = title {
+            aggregate.update_title(new_title, updated_by)?;
+        }
+
+        // Update content if provided
+        if let Some(new_content) = content {
+            aggregate.update_content(new_content, None, updated_by)?;
+        }
+
+        // Save changes
+        let updated_document = self.document_repository.save(aggregate.document()).await?;
+        
+        // Reload aggregate to ensure version consistency
+        let reloaded_aggregate = DocumentAggregate::load_from_document(updated_document);
+        let mut final_aggregate = reloaded_aggregate;
+        final_aggregate.mark_events_as_committed();
+
+        Ok(final_aggregate)
     }
 
     pub async fn create_document(

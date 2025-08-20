@@ -7,14 +7,20 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = ["database", "ai"]
+database = ["sqlx"]
+ai = ["writemagic-ai"]
+wasm = []
+
 [dependencies]
 # Workspace dependencies
 writemagic-shared = { path = "../shared" }
-writemagic-ai = { path = "../ai" }
+writemagic-ai = { path = "../ai", optional = true }
+writemagic-agent = { path = "../agent" }
 
 # Async
 async-trait.workspace = true
-tokio.workspace = true
 
 # Serialization
 serde.workspace = true
@@ -24,10 +30,27 @@ serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 
-# Database
-sqlx.workspace = true
+# Target-specific dependencies  
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { version = "1.44", default-features = false, features = ["rt", "macros", "time", "sync"] }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true }
+js-sys = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde", "js"] }
+chrono = { workspace = true, features = ["serde", "wasmbind"] }
+futures = { workspace = true }
+validator = { workspace = true }
+regex = { workspace = true }
+unicode-segmentation = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
 
-# UUID and time
+# Database (conditional for WASM and feature-gated)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true }
+sqlx = { workspace = true, optional = true }
 uuid.workspace = true
 chrono.workspace = true
 

@@ -8,7 +8,6 @@ use garde::Validate;
 use serde::de::DeserializeOwned;
 use validator::Validate as ValidatorValidate;
 
-use crate::error::AppError;
 
 /// JSON extractor with validation using `garde`
 /// This extractor deserializes JSON and validates it using garde validation rules
@@ -19,6 +18,7 @@ pub struct ValidatedJson<T>(pub T);
 impl<T, S> FromRequest<S> for ValidatedJson<T>
 where
     T: DeserializeOwned + Validate,
+    T::Context: Default,
     S: Send + Sync,
 {
     type Rejection = ValidationError;
@@ -28,7 +28,7 @@ where
             .await
             .map_err(ValidationError::JsonExtraction)?;
 
-        value.validate(&()).map_err(ValidationError::Validation)?;
+        value.validate().map_err(ValidationError::Validation)?;
 
         Ok(ValidatedJson(value))
     }

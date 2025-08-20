@@ -1,11 +1,9 @@
 //! Advanced performance techniques for high-throughput systems
 
 use std::fs::File;
-use std::io::{self, Read, Write, Seek, SeekFrom};
 use std::path::Path;
 use memmap2::{Mmap, MmapMut, MmapOptions};
-use std::sync::Arc;
-use writemagic_shared::{Result, WritemagicError};
+use crate::{Result, WritemagicError};
 
 /// Memory-mapped file wrapper for zero-copy data access
 pub struct MappedFile {
@@ -122,6 +120,7 @@ impl MappedFileMut {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(path)
             .map_err(|e| WritemagicError::internal_with_source("Failed to create file", e))?;
         
@@ -171,8 +170,6 @@ impl MappedFileMut {
 
 /// High-performance custom serialization for hot paths
 pub mod fast_serialization {
-    use super::*;
-    use std::mem;
     
     /// Custom serializer that writes directly to a buffer without intermediate allocations
     pub struct FastSerializer {
@@ -340,8 +337,8 @@ pub mod fast_serialization {
 
 /// High-performance batch processing utilities
 pub mod batch_processing {
-    use super::*;
-    use rayon::prelude::*;
+    // Remove unused import since parallel processing is not currently used
+    // use rayon::prelude::*;
     
     /// Process large datasets in parallel chunks with optimal memory usage
     pub struct BatchProcessor<T> {
@@ -357,7 +354,10 @@ pub mod batch_processing {
         pub fn new(chunk_size: usize) -> Self {
             Self {
                 chunk_size,
+                #[cfg(not(target_arch = "wasm32"))]
                 worker_threads: num_cpus::get(),
+                #[cfg(target_arch = "wasm32")]
+                worker_threads: 1, // Single-threaded for WASM
                 _phantom: std::marker::PhantomData,
             }
         }
@@ -373,54 +373,76 @@ pub mod batch_processing {
             F: Fn(&T) -> R + Send + Sync,
             R: Send,
         {
-            // Configure rayon thread pool
-            let pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(self.worker_threads)
-                .build()
-                .unwrap();
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                use rayon::prelude::*;
+                
+                // Configure rayon thread pool
+                let pool = rayon::ThreadPoolBuilder::new()
+                    .num_threads(self.worker_threads)
+                    .build()
+                    .unwrap();
+                
+                pool.install(|| {
+                    items
+                        .par_chunks(self.chunk_size)
+                        .flat_map(|chunk| {
+                            chunk.iter().map(&processor).collect::<Vec<_>>()
+                        })
+                        .collect()
+                })
+            }
             
-            pool.install(|| {
-                items
-                    .par_chunks(self.chunk_size)
-                    .flat_map(|chunk| {
-                        chunk.iter().map(&processor).collect::<Vec<_>>()
-                    })
-                    .collect()
-            })
+            #[cfg(target_arch = "wasm32")]
+            {
+                // Single-threaded fallback for WASM
+                items.iter().map(processor).collect()
+            }
         }
         
         /// Process items with a stateful processor that can accumulate results
-        pub fn process_with_state<F, S, R>(&self, items: &[T], mut init_state: S, processor: F) -> Vec<R>
+        pub fn process_with_state<F, S, R>(&self, items: &[T], init_state: S, processor: F) -> Vec<R>
         where
             F: Fn(&mut S, &T) -> Option<R> + Send + Sync,
-            S: Clone + Send,
+            S: Clone + Send + Sync,
             R: Send,
         {
-            let pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(self.worker_threads)
-                .build()
-                .unwrap();
-            
-            pool.install(|| {
-                items
-                    .par_chunks(self.chunk_size)
-                    .flat_map(|chunk| {
-                        let mut local_state = init_state.clone();
-                        chunk
-                            .iter()
-                            .filter_map(|item| processor(&mut local_state, item))
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                use rayon::prelude::*;
+                
+                let pool = rayon::ThreadPoolBuilder::new()
+                    .num_threads(self.worker_threads)
+                    .build()
+                    .unwrap();
+                
+                pool.install(|| {
+                    items
+                        .par_chunks(self.chunk_size)
+                        .flat_map(|chunk| {
+                            let mut local_state = init_state.clone();
+                            chunk
+                                .iter()
+                                .filter_map(|item| processor(&mut local_state, item))
                             .collect::<Vec<_>>()
                     })
                     .collect()
-            })
+                })
+            }
+            
+            #[cfg(target_arch = "wasm32")]
+            {
+                // Single-threaded fallback for WASM
+                let mut state = init_state;
+                items.iter().filter_map(|item| processor(&mut state, item)).collect()
+            }
         }
     }
 }
 
 /// Lock-free data structures for high-concurrency scenarios
 pub mod lock_free {
-    use super::*;
-    use crossbeam::epoch::{self, Atomic, Guard, Owned, Shared};
+    use crossbeam::epoch::{self, Atomic, Owned};
     use std::sync::atomic::{AtomicUsize, Ordering};
     
     /// Lock-free queue implementation using epoch-based memory management
@@ -442,7 +464,7 @@ pub mod lock_free {
                 next: Atomic::null(),
             });
             
-            let sentinel_ptr = sentinel.into_shared(epoch::unprotected());
+            let sentinel_ptr = unsafe { sentinel.into_shared(epoch::unprotected()) };
             
             Self {
                 head: Atomic::from(sentinel_ptr),
@@ -452,7 +474,7 @@ pub mod lock_free {
         }
         
         pub fn enqueue(&self, item: T) {
-            let new_node = Owned::new(Node {
+            let mut new_node = Owned::new(Node {
                 data: Some(item),
                 next: Atomic::null(),
             });
@@ -552,7 +574,7 @@ pub mod lock_free {
         }
         
         pub fn is_empty(&self) -> bool {
-            self.len() == 0
+            self.size.load(Ordering::Relaxed) == 0
         }
     }
     

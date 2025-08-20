@@ -1,5 +1,5 @@
 // Jest setup configuration for all test environments
-import '@testing-library/jest-dom';
+require('@testing-library/jest-dom');
 
 // Mock WASM module for tests
 const mockWasm = {
@@ -90,6 +90,55 @@ global.console = {
   error: jest.fn(),
   debug: jest.fn()
 };
+
+// Mock ContentUtilities for DocumentManager tests
+const MockContentUtilities = jest.fn().mockImplementation(() => ({
+  applyTemplate: jest.fn((template, content) => content),
+  validateContent: jest.fn(() => ({ isValid: true, errors: [] })),
+  countWords: jest.fn((text) => text.split(/\s+/).filter(word => word.length > 0).length),
+  analyzeChanges: jest.fn(() => ({ added: 0, removed: 0, modified: 0 })),
+  searchDocuments: jest.fn((docs, query) => docs.filter(doc => 
+    doc.title.includes(query) || doc.content.includes(query)
+  )),
+  estimateReadingTime: jest.fn(() => 5),
+  analyzeComplexity: jest.fn(() => 'medium')
+}));
+
+// Mock EventEmitter for DocumentManager
+const MockEventEmitter = jest.fn().mockImplementation(() => {
+  const listeners = new Map();
+  
+  return {
+    on: jest.fn((event, callback) => {
+      if (!listeners.has(event)) {
+        listeners.set(event, []);
+      }
+      listeners.get(event).push(callback);
+    }),
+    emit: jest.fn((event, data) => {
+      if (listeners.has(event)) {
+        listeners.get(event).forEach(callback => callback(data));
+      }
+    }),
+    removeAllListeners: jest.fn(() => {
+      listeners.clear();
+    })
+  };
+});
+
+// Mock debounce utility
+const mockDebounce = jest.fn((fn, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(null, args), delay);
+  };
+});
+
+// Add to global for module imports
+global.MockContentUtilities = MockContentUtilities;
+global.MockEventEmitter = MockEventEmitter;
+global.mockDebounce = mockDebounce;
 
 // Cleanup after each test
 afterEach(() => {

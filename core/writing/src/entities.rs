@@ -1,6 +1,6 @@
 //! Writing domain entities
 
-use chrono::{DateTime, Utc};
+// Remove unused chrono imports
 use serde::{Deserialize, Serialize};
 use writemagic_shared::{EntityId, Timestamp, ContentHash, FilePath, ContentType, Entity, AggregateRoot, Auditable, Versioned};
 

@@ -6,6 +6,13 @@ use std::fmt;
 use uuid::Uuid;
 use validator::Validate;
 
+/// Simple message type for buffer pool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Message {
+    pub content: String,
+    pub timestamp: DateTime<Utc>,
+}
+
 /// Unique identifier for entities
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EntityId(pub Uuid);
@@ -21,6 +28,10 @@ impl EntityId {
 
     pub fn from_string(s: &str) -> Result<Self, uuid::Error> {
         Ok(Self(Uuid::parse_str(s)?))
+    }
+
+    pub fn new_from_string(s: &str) -> Result<Self, uuid::Error> {
+        Self::from_string(s)
     }
 
     pub fn as_uuid(&self) -> Uuid {
@@ -115,7 +126,7 @@ impl fmt::Display for ContentHash {
 }
 
 /// File path value object
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Validate, Default)]
 pub struct FilePath {
     #[validate(length(min = 1, max = 4096))]
     pub path: String,
@@ -140,11 +151,7 @@ impl FilePath {
     }
 }
 
-impl Default for FilePath {
-    fn default() -> Self {
-        Self { path: String::new() }
-    }
-}
+// Default implementation now provided by derive macro
 
 impl fmt::Display for FilePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

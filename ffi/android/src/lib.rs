@@ -1,20 +1,15 @@
 //! Android FFI bindings for WriteMagic core - Thread-safe and performance optimized
 
-use jni::objects::{JClass, JObject, JString, JValue};
-use jni::sys::{jboolean, jlong, jstring};
+use jni::objects::{JClass, JString};
+use jni::sys::{jboolean, jstring};
 use jni::JNIEnv;
 use std::sync::{Arc, RwLock, OnceLock};
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
 use tokio::runtime::Runtime;
-use writemagic_shared::{EntityId, ContentType, Repository, Pagination, Result, WritemagicError};
+use writemagic_shared::{EntityId, ContentType, Pagination, Result, WritemagicError};
 use writemagic_writing::{
-    CoreEngine, ApplicationConfigBuilder, ApplicationConfig, AIConfig,
-    entities::{Document, Project},
+    CoreEngine, ApplicationConfigBuilder,
     value_objects::{DocumentTitle, DocumentContent, ProjectName},
-    services::{DocumentManagementService, ProjectManagementService},
-    repositories::{DocumentRepository, ProjectRepository},
 };
 
 /// Thread-safe FFI error codes for proper error handling
@@ -57,7 +52,6 @@ impl<T> FFIResult<T> {
 }
 
 /// Thread-safe instance manager for CoreEngine lifecycle
-#[derive(Debug)]
 pub struct FFIInstanceManager {
     engine: Arc<RwLock<CoreEngine>>,
     runtime: Arc<Runtime>,
@@ -72,7 +66,7 @@ impl FFIInstanceManager {
     ) -> Result<Self> {
         let runtime = Arc::new(
             Runtime::new()
-                .map_err(|e| WritemagicError::Infrastructure(format!("Failed to create runtime: {}", e)))?
+                .map_err(|e| WritemagicError::internal(format!("Failed to create runtime: {}", e)))?
         );
         
         let engine = runtime.block_on(async {
@@ -313,7 +307,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeCreateDocum
     let content_type_str = match java_string_to_rust(&mut env, &content_type) {
         FFIResult { value: Some(s), .. } => s,
         FFIResult { error_message, .. } => {
-            log::error!("Failed to extract content_type: {:?}", content_type);
+            log::error!("Failed to extract content_type: {:?}", error_message);
             return std::ptr::null_mut();
         }
     };
@@ -566,7 +560,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeGetDocument
 
 /// Create a new project with enhanced error handling
 #[no_mangle]
-pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createProject(
+pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeCreateProject(
     mut env: JNIEnv,
     _class: JClass,
     name: JString,
@@ -662,7 +656,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_createProject(
 
 /// Get project by ID with enhanced error handling
 #[no_mangle]
-pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_getProject(
+pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeGetProject(
     mut env: JNIEnv,
     _class: JClass,
     project_id: JString,

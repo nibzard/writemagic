@@ -25,19 +25,17 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
     span.record("request_id", &request_id);
 
     // Ensure the request has the ID in headers
-    request.headers_mut().insert(
-        REQUEST_ID_HEADER,
-        HeaderValue::from_str(&request_id).unwrap(),
-    );
+    if let Ok(header_value) = HeaderValue::from_str(&request_id) {
+        request.headers_mut().insert(REQUEST_ID_HEADER, header_value);
+    }
 
     // Process the request
     let mut response = next.run(request).await;
 
     // Add request ID to response headers
-    response.headers_mut().insert(
-        REQUEST_ID_HEADER,
-        HeaderValue::from_str(&request_id).unwrap(),
-    );
+    if let Ok(header_value) = HeaderValue::from_str(&request_id) {
+        response.headers_mut().insert(REQUEST_ID_HEADER, header_value);
+    }
 
     response
 }

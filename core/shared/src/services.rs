@@ -3,7 +3,8 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::{EntityId, Result, WritemagicError, DomainEvent, EventBus};
+use crate::{EntityId, Result, WritemagicError};
+use crate::events::EventBus;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

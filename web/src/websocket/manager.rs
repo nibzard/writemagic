@@ -92,7 +92,7 @@ impl ConnectionManager {
             
             // Notify other users about the new subscriber
             let user_joined = ServerMessage::UserJoined {
-                document_id,
+                document_id: document_id.clone(),
                 user_id: connection.user_id.clone(),
                 username: connection.username.clone(),
             };

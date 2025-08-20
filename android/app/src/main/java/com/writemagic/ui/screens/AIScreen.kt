@@ -2,6 +2,7 @@ package com.writemagic.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -11,7 +12,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import com.writemagic.core.WriteMagicCore
+
+@Serializable
+data class AIResponse(
+    val completion: String? = null,
+    val error: String? = null,
+    val success: Boolean
+)
 
 data class ChatMessage(
     val content: String,
@@ -32,6 +46,8 @@ fun AIScreen() {
     var inputText by remember { mutableStateOf("") }
     var selectedProvider by remember { mutableStateOf("Claude") }
     var isProcessing by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     
     val providers = listOf("Claude", "GPT-4", "Local Model")
     
@@ -111,21 +127,90 @@ fun AIScreen() {
                 FilledTonalIconButton(
                     onClick = {
                         if (inputText.isNotBlank() && !isProcessing) {
-                            messages = messages + ChatMessage(inputText, true)
-                            isProcessing = true
-                            
-                            // Simulate AI response
                             val userMessage = inputText
+                            messages = messages + ChatMessage(userMessage, true)
                             inputText = ""
+                            isProcessing = true
+                            errorMessage = null
                             
-                            // Mock AI response after delay
-                            // In real implementation, this would call the Rust FFI
-                            // processAIRequest(userMessage, context)
+                            scope.launch {
+                                try {
+                                    val model = when (selectedProvider) {
+                                        "Claude" -> "claude-3-sonnet"
+                                        "GPT-4" -> "gpt-4"
+                                        else -> ""
+                                    }
+                                    
+                                    val response = WriteMagicCore.completeText(userMessage, model)
+                                    response?.let { jsonResponse ->
+                                        val aiResponse = Json.decodeFromString<AIResponse>(jsonResponse)
+                                        
+                                        if (aiResponse.success && aiResponse.completion != null) {
+                                            messages = messages + ChatMessage(aiResponse.completion, false)
+                                        } else {
+                                            val errorMsg = aiResponse.error ?: "AI request failed"
+                                            messages = messages + ChatMessage("Sorry, I encountered an error: $errorMsg", false)
+                                            errorMessage = errorMsg
+                                        }
+                                    } ?: run {
+                                        val errorMsg = "Failed to get AI response"
+                                        messages = messages + ChatMessage("Sorry, I'm not available right now. Please try again later.", false)
+                                        errorMessage = errorMsg
+                                    }
+                                } catch (e: Exception) {
+                                    val errorMsg = "Error: ${e.message}"
+                                    messages = messages + ChatMessage("Sorry, I encountered an error. Please try again.", false)
+                                    errorMessage = errorMsg
+                                } finally {
+                                    isProcessing = false
+                                }
+                            }
                         }
                     },
                     enabled = inputText.isNotBlank() && !isProcessing
                 ) {
                     Icon(Icons.Default.Send, contentDescription = "Send")
+                }
+            }
+        }
+        
+        // Error message display
+        errorMessage?.let { error ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = { errorMessage = null }
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Dismiss",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
                 }
             }
         }
@@ -137,20 +222,46 @@ fun AIScreen() {
         ) {
             item {
                 AssistantChip(
-                    onClick = { inputText = "Continue writing from where I left off" },
-                    label = { Text("Continue Writing") }
+                    onClick = { 
+                        if (!isProcessing) {
+                            inputText = "Continue writing from where I left off"
+                        }
+                    },
+                    label = { Text("Continue Writing") },
+                    enabled = !isProcessing
                 )
             }
             item {
                 AssistantChip(
-                    onClick = { inputText = "Improve the clarity of this paragraph" },
-                    label = { Text("Improve Clarity") }
+                    onClick = { 
+                        if (!isProcessing) {
+                            inputText = "Improve the clarity of this paragraph"
+                        }
+                    },
+                    label = { Text("Improve Clarity") },
+                    enabled = !isProcessing
                 )
             }
             item {
                 AssistantChip(
-                    onClick = { inputText = "Suggest alternative phrasings" },
-                    label = { Text("Rephrase") }
+                    onClick = { 
+                        if (!isProcessing) {
+                            inputText = "Suggest alternative phrasings"
+                        }
+                    },
+                    label = { Text("Rephrase") },
+                    enabled = !isProcessing
+                )
+            }
+            item {
+                AssistantChip(
+                    onClick = { 
+                        if (!isProcessing) {
+                            inputText = "Help me brainstorm ideas for my writing"
+                        }
+                    },
+                    label = { Text("Brainstorm") },
+                    enabled = !isProcessing
                 )
             }
         }

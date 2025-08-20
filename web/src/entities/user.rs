@@ -1,4 +1,5 @@
 use sea_orm::entity::prelude::*;
+use sea_orm::Set;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -59,15 +60,16 @@ impl ActiveModelBehavior for ActiveModel {
         }
     }
 
-    fn before_save<C>(mut self, _db: &C, insert: bool) -> Result<Self, DbErr>
-    where
-        C: ConnectionTrait,
-    {
-        if !insert {
-            self.updated_at = Set(chrono::Utc::now());
-        }
-        Ok(self)
-    }
+    // TODO: Fix SeaORM lifetime issues with before_save
+    // async fn before_save<C>(mut self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    // where
+    //     C: ConnectionTrait,
+    // {
+    //     if !insert {
+    //         self.updated_at = Set(chrono::Utc::now());
+    //     }
+    //     Ok(self)
+    // }
 }
 
 impl Model {

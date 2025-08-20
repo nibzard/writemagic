@@ -3,14 +3,13 @@
 use writemagic_shared::{EntityId, WritemagicError, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use garde::Validate;
+use validator::Validate;
 
 /// Project entity representing a collection of documents and workspace configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct Project {
     pub id: EntityId,
-    #[garde(length(min = 1, max = 200))]
+    #[validate(length(min = 1, max = 200))]
     pub name: String,
     pub description: Option<String>,
     pub document_ids: Vec<EntityId>,

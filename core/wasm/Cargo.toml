@@ -14,11 +14,14 @@ crate-type = ["cdylib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-# Core WriteMagic dependencies
-writemagic-shared = { path = "../shared", features = ["wasm"] }
-writemagic-writing = { path = "../writing" }
-writemagic-ai = { path = "../ai" }
-writemagic-project = { path = "../project" }
+# Core WriteMagic dependencies - WASM compatible only
+writemagic-shared = { path = "../shared", default-features = false, features = ["wasm"] }
+writemagic-writing = { path = "../writing", default-features = false, features = ["wasm"] }
+writemagic-project = { path = "../project", default-features = false, features = ["wasm"] }
+# Note: AI, version-control, and agent domains excluded from WASM build due to native dependencies
+# writemagic-ai = { path = "../ai" }  # Requires reqwest with native networking
+# writemagic-version-control = { path = "../version_control" }  # Requires git2 with native compilation  
+# writemagic-agent = { path = "../agent" }  # Requires file system access
 
 # WASM bindings
 wasm-bindgen = { workspace = true, features = ["serde-serialize"] }
@@ -43,13 +46,12 @@ web-sys = { workspace = true, features = [
     "Storage",
     "Event",
     "EventTarget"
-]
+] }
 
 # Error handling for WASM
 console_error_panic_hook = { workspace = true, optional = true }
 
-# Async runtime for WASM
-tokio = { workspace = true, features = ["rt", "macros", "time", "sync"] }
+# Async runtime properly configured for WASM
 futures = { workspace = true }
 
 # Serialization
@@ -73,6 +75,9 @@ thiserror = { workspace = true }
 # Logging for WASM
 log = { workspace = true }
 console_log = "1.0"
+
+# Override workspace tokio with WASM-compatible features only
+tokio = { version = "1.44", default-features = false, features = ["rt", "macros", "time", "sync"] }
 
 [build-dependencies]
 chrono = { workspace = true }

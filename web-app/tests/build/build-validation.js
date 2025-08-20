@@ -55,11 +55,8 @@ class BuildValidationRunner {
       'web-app/src/js/index.js',
       'web-app/src/js/document-manager.js',
       'web-app/src/js/project-workspace.js',
-      'web-app/src/js/ai-proxy-integration.js',
       'core/wasm/Cargo.toml',
       'core/wasm/src/lib.rs',
-      'ai-proxy/package.json',
-      'ai-proxy/server.js',
       'scripts/build-wasm.sh',
       'scripts/setup-wasm.sh'
     ];
@@ -72,8 +69,6 @@ class BuildValidationRunner {
       'web-app/public/styles',
       'web-app/public/scripts',
       'core/wasm/src',
-      'ai-proxy/routes',
-      'ai-proxy/services'
     ];
 
     const structureResults = {
@@ -333,7 +328,6 @@ class BuildValidationRunner {
     
     const dependencyResults = {
       webAppDeps: { valid: false, vulnerabilities: 0, outdated: 0 },
-      aiProxyDeps: { valid: false, vulnerabilities: 0, outdated: 0 },
       rustDeps: { valid: false, errors: [] }
     };
 
@@ -358,25 +352,6 @@ class BuildValidationRunner {
         }
       }
 
-      // Check AI proxy dependencies
-      const aiProxyPackage = path.join(this.rootDir, 'ai-proxy/package.json');
-      if (await fs.access(aiProxyPackage).then(() => true).catch(() => false)) {
-        try {
-          execSync('npm audit --json', {
-            cwd: path.join(this.rootDir, 'ai-proxy'),
-            stdio: 'pipe'
-          });
-          dependencyResults.aiProxyDeps.valid = true;
-        } catch (auditError) {
-          const auditOutput = auditError.stdout?.toString() || '{}';
-          try {
-            const auditData = JSON.parse(auditOutput);
-            dependencyResults.aiProxyDeps.vulnerabilities = auditData.metadata?.vulnerabilities?.total || 0;
-          } catch (e) {
-            console.log(chalk.yellow(`    AI proxy audit parsing failed`));
-          }
-        }
-      }
 
       // Check Rust dependencies
       try {
@@ -398,19 +373,16 @@ class BuildValidationRunner {
       timestamp: new Date().toISOString(),
       duration: 0,
       status: dependencyResults.webAppDeps.valid && 
-              dependencyResults.aiProxyDeps.valid && 
               dependencyResults.rustDeps.valid &&
-              dependencyResults.webAppDeps.vulnerabilities === 0 &&
-              dependencyResults.aiProxyDeps.vulnerabilities === 0 ? 'PASS' : 'FAIL',
+              dependencyResults.webAppDeps.vulnerabilities === 0 ? 'PASS' : 'FAIL',
       metrics: dependencyResults,
       thresholds: {
         webAppDepsValid: { value: dependencyResults.webAppDeps.valid, threshold: true, passed: dependencyResults.webAppDeps.valid },
-        aiProxyDepsValid: { value: dependencyResults.aiProxyDeps.valid, threshold: true, passed: dependencyResults.aiProxyDeps.valid },
         rustDepsValid: { value: dependencyResults.rustDeps.valid, threshold: true, passed: dependencyResults.rustDeps.valid },
         noVulnerabilities: { 
-          value: dependencyResults.webAppDeps.vulnerabilities + dependencyResults.aiProxyDeps.vulnerabilities, 
+          value: dependencyResults.webAppDeps.vulnerabilities, 
           threshold: 0, 
-          passed: dependencyResults.webAppDeps.vulnerabilities + dependencyResults.aiProxyDeps.vulnerabilities === 0 
+          passed: dependencyResults.webAppDeps.vulnerabilities === 0 
         }
       }
     };
@@ -418,7 +390,6 @@ class BuildValidationRunner {
     this.results.tests.push(testResult);
     
     console.log(chalk.gray(`    Web app vulnerabilities: ${dependencyResults.webAppDeps.vulnerabilities}`));
-    console.log(chalk.gray(`    AI proxy vulnerabilities: ${dependencyResults.aiProxyDeps.vulnerabilities}`));
     console.log(chalk.gray(`    Rust deps valid: ${dependencyResults.rustDeps.valid}`));
   }
 
@@ -564,14 +535,12 @@ class BuildValidationRunner {
     
     const envResults = {
       webAppConfigValid: false,
-      aiProxyConfigValid: false,
       requiredEnvVars: [],
       missingEnvVars: [],
       configurationScore: 0
     };
 
     const requiredEnvVars = [
-      'AI_PROXY_URL',
       'CLAUDE_API_KEY',
       'OPENAI_API_KEY',
       'NODE_ENV',
@@ -585,11 +554,6 @@ class BuildValidationRunner {
         envResults.webAppConfigValid = true;
       }
 
-      // Check AI proxy configuration
-      const aiProxyConfig = path.join(this.rootDir, 'ai-proxy/config/index.js');
-      if (await fs.access(aiProxyConfig).then(() => true).catch(() => false)) {
-        envResults.aiProxyConfigValid = true;
-      }
 
       // Check environment variables
       for (const envVar of requiredEnvVars) {
@@ -611,12 +575,10 @@ class BuildValidationRunner {
       timestamp: new Date().toISOString(),
       duration: 0,
       status: envResults.webAppConfigValid && 
-              envResults.aiProxyConfigValid && 
               envResults.configurationScore > 60 ? 'PASS' : 'FAIL',
       metrics: envResults,
       thresholds: {
         webAppConfigValid: { value: envResults.webAppConfigValid, threshold: true, passed: envResults.webAppConfigValid },
-        aiProxyConfigValid: { value: envResults.aiProxyConfigValid, threshold: true, passed: envResults.aiProxyConfigValid },
         configurationScore: { value: envResults.configurationScore, threshold: 60, passed: envResults.configurationScore > 60 }
       }
     };

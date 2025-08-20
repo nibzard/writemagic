@@ -1,13 +1,13 @@
 //! Agent domain services
 
 use writemagic_shared::{EntityId, WritemagicError, Result};
-use crate::aggregates::{AgentAggregate, QueuedExecution, ExecutionRecord, ExecutionStatistics, QueueStatus};
-use crate::entities::{Agent, AgentWorkflow, WorkflowAction, ExecutionContext, ExecutionResult, ExecutionEnvironment, TriggerType};
+use crate::aggregates::{AgentAggregate, QueuedExecution, ExecutionStatistics, ResourceUsage};
+use crate::entities::{Agent, AgentWorkflow, ExecutionContext, ExecutionResult, TriggerType, AgentStatus};
 use crate::repositories::{AgentRepository, AgentWorkflowRepository, ExecutionRepository, AgentSearchCriteria, WorkflowSearchCriteria};
-use crate::value_objects::{ExecutionPriority, ExecutionStrategy, ResourceQuota, WorkflowValidation, ExecutionTimeout};
-use async_trait::async_trait;
-use chrono::{DateTime, Utc, Duration};
-use serde_json::{Value, Map};
+use crate::value_objects::{ExecutionPriority, ExecutionStrategy, WorkflowValidation};
+use chrono::{DateTime, Utc};
+use std::time::Duration;
+use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::{RwLock, Mutex};
@@ -138,7 +138,20 @@ impl AgentManagementService {
     
     /// Get agent statistics
     pub async fn get_agent_statistics(&self, agent_id: &EntityId) -> Result<ExecutionStatistics> {
-        self.execution_repository.get_execution_stats(agent_id).await
+        let repo_stats = self.execution_repository.get_execution_stats(agent_id).await?;
+        
+        // Convert from repository stats to aggregates stats
+        Ok(ExecutionStatistics {
+            total_executions: repo_stats.total_executions,
+            successful_executions: repo_stats.successful_executions,
+            failed_executions: repo_stats.failed_executions,
+            success_rate: repo_stats.success_rate as f32,
+            average_duration: std::time::Duration::from_millis(repo_stats.average_duration_ms),
+            queue_size: 0, // Would need to get this from somewhere else
+            current_status: AgentStatus::Active, // Would need to determine this
+            last_execution: repo_stats.last_execution_at,
+            resource_usage: ResourceUsage::default(),
+        })
     }
     
     /// List all active agents
@@ -165,7 +178,7 @@ impl AgentManagementService {
         self.agent_repository
             .load(agent_id)
             .await?
-            .ok_or_else(|| WritemagicError::not_found(&format!("Agent not found: {}", agent_id)))
+            .ok_or_else(|| WritemagicError::not_found(format!("Agent not found: {}", agent_id)))
     }
     
     /// Get running agent reference
@@ -202,11 +215,16 @@ impl AgentManagementService {
     }
 }
 
+/// Type alias for running agents map to reduce complexity
+type RunningAgents = Arc<RwLock<HashMap<EntityId, Arc<Mutex<AgentAggregate>>>>>;
+
 /// Service for executing agent workflows
 pub struct AgentExecutionService {
     agent_repository: Arc<dyn AgentRepository>,
+    #[allow(dead_code)] // TODO: Implement execution tracking in Phase 2
     execution_repository: Arc<dyn ExecutionRepository>,
-    running_agents: Arc<RwLock<HashMap<EntityId, Arc<Mutex<AgentAggregate>>>>>,
+    running_agents: RunningAgents,
+    #[allow(dead_code)] // TODO: Implement execution queue processing in Phase 2
     execution_queue: Arc<Mutex<VecDeque<QueuedExecution>>>,
 }
 
@@ -215,7 +233,7 @@ impl AgentExecutionService {
     pub fn new(
         agent_repository: Arc<dyn AgentRepository>,
         execution_repository: Arc<dyn ExecutionRepository>,
-        running_agents: Arc<RwLock<HashMap<EntityId, Arc<Mutex<AgentAggregate>>>>>,
+        running_agents: RunningAgents,
     ) -> Self {
         Self {
             agent_repository,
@@ -236,7 +254,7 @@ impl AgentExecutionService {
     ) -> Result<EntityId> {
         // Get running agent
         let agent_mutex = self.get_running_agent(agent_id).await
-            .ok_or_else(|| WritemagicError::not_found(&format!("Running agent not found: {}", agent_id)))?;
+            .ok_or_else(|| WritemagicError::not_found(format!("Running agent not found: {}", agent_id)))?;
         
         let mut agent = agent_mutex.lock().await;
         
@@ -244,7 +262,7 @@ impl AgentExecutionService {
         let execution_id = agent.queue_execution(trigger_type, context, priority, execute_after)?;
         
         // Save updated agent state
-        self.agent_repository.save(&mut *agent).await?;
+        self.agent_repository.save(&mut agent).await?;
         
         Ok(execution_id)
     }
@@ -268,7 +286,7 @@ impl AgentExecutionService {
         execution: QueuedExecution,
     ) -> Result<ExecutionResult> {
         let agent_mutex = self.get_running_agent(&agent_id).await
-            .ok_or_else(|| WritemagicError::not_found(&format!("Running agent not found: {}", agent_id)))?;
+            .ok_or_else(|| WritemagicError::not_found(format!("Running agent not found: {}", agent_id)))?;
         
         let mut agent = agent_mutex.lock().await;
         
@@ -279,7 +297,7 @@ impl AgentExecutionService {
         // Execute workflow steps
         let result = self.execute_workflow_steps(&context).await;
         let end_time = Utc::now();
-        let duration = end_time - start_time;
+        let duration = (end_time - start_time).to_std().unwrap_or(std::time::Duration::from_secs(0));
         
         // Create execution result
         let execution_result = match result {
@@ -293,7 +311,7 @@ impl AgentExecutionService {
         
         // Record execution completion
         let resource_usage = crate::aggregates::ExecutionResourceUsage {
-            cpu_time_ms: duration.num_milliseconds() as u64,
+            cpu_time_ms: duration.as_millis() as u64,
             memory_peak_mb: 0, // Would be measured during execution
             disk_io_bytes: 0,  // Would be measured during execution
             network_io_bytes: 0, // Would be measured during execution
@@ -303,7 +321,7 @@ impl AgentExecutionService {
         agent.complete_execution(execution.id, execution_result.clone(), resource_usage)?;
         
         // Save updated agent state
-        self.agent_repository.save(&mut *agent).await?;
+        self.agent_repository.save(&mut agent).await?;
         
         Ok(execution_result)
     }
@@ -311,9 +329,9 @@ impl AgentExecutionService {
     /// Execute workflow steps
     async fn execute_workflow_steps(
         &self,
-        context: &ExecutionContext,
+        _context: &ExecutionContext,
     ) -> Result<BTreeMap<String, Value>> {
-        let mut outputs = BTreeMap::new();
+        let outputs = BTreeMap::new();
         
         // For now, just return success with empty outputs
         // In a real implementation, this would:
@@ -448,6 +466,7 @@ pub struct SystemStatus {
 pub struct AgentOrchestrationService {
     management_service: Arc<AgentManagementService>,
     execution_service: Arc<AgentExecutionService>,
+    #[allow(dead_code)] // TODO: Implement workflow orchestration in Phase 2
     workflow_service: Arc<AgentWorkflowService>,
 }
 
@@ -499,12 +518,12 @@ impl AgentOrchestrationService {
         
         let execute_after = match strategy {
             ExecutionStrategy::Immediate => None,
-            ExecutionStrategy::Scheduled => Some(Utc::now() + Duration::minutes(1)),
+            ExecutionStrategy::Scheduled => Some(Utc::now() + chrono::Duration::minutes(1)),
             _ => None,
         };
         
         // Trigger execution
-        let execution_id = self.execution_service
+        let _execution_id = self.execution_service
             .trigger_execution(agent_id, trigger_type, context, priority, execute_after)
             .await?;
         
