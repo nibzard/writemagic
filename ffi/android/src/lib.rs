@@ -55,14 +55,14 @@ impl<T> FFIResult<T> {
 pub struct FFIInstanceManager {
     engine: Arc<RwLock<CoreEngine>>,
     runtime: Arc<Runtime>,
-    instance_id: String,
+    _instance_id: String,
 }
 
 impl FFIInstanceManager {
     pub async fn new(
         claude_key: Option<String>, 
         openai_key: Option<String>,
-        instance_id: String,
+        _instance_id: String,
     ) -> Result<Self> {
         let runtime = Arc::new(
             Runtime::new()
@@ -83,7 +83,7 @@ impl FFIInstanceManager {
         Ok(Self {
             engine: Arc::new(RwLock::new(engine)),
             runtime,
-            instance_id,
+            _instance_id,
         })
     }
     
@@ -281,7 +281,7 @@ pub extern "system" fn Java_com_writemagic_core_WriteMagicCore_nativeCreateDocum
     // Get instance manager with proper error handling
     let manager = match get_default_instance() {
         FFIResult { value: Some(mgr), .. } => mgr,
-        FFIResult { error_code, error_message, .. } => {
+        FFIResult { error_message, .. } => {
             log::error!("Failed to get CoreEngine instance: {:?}", error_message);
             return std::ptr::null_mut();
         }

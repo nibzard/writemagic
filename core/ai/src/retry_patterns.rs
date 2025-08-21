@@ -310,7 +310,7 @@ pub fn with_retry<F, Fut, T, E>(
 ) -> RetryFuture<F, Fut, T, E>
 where
     F: FnMut() -> Fut,
-    Fut: Future<Output = std::result::Result<T, E>>,
+    Fut: Future<Output = std::result::Result<T, E>> + Unpin,
 {
     RetryFuture::new(operation, config)
 }
@@ -323,7 +323,7 @@ pub fn with_retry_and_circuit_breaker<F, Fut, T, E>(
 ) -> RetryFuture<F, Fut, T, E>
 where
     F: FnMut() -> Fut,
-    Fut: Future<Output = std::result::Result<T, E>>,
+    Fut: Future<Output = std::result::Result<T, E>> + Unpin,
 {
     RetryFuture::new(operation, retry_config)
         .with_circuit_breaker(CircuitBreaker::new(circuit_config))
@@ -372,16 +372,16 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = Arc::clone(&counter);
 
-        let result = with_retry(
+        let result: Result<&str, &str> = with_retry(
             move || {
                 let count = counter_clone.fetch_add(1, Ordering::SeqCst);
-                async move {
+                Box::pin(async move {
                     if count < 2 {
                         Err("failure")
                     } else {
                         Ok("success")
                     }
-                }
+                })
             },
             RetryConfig::default(),
         ).await;
@@ -395,10 +395,10 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = Arc::clone(&counter);
 
-        let result = with_retry(
+        let result: Result<&str, &str> = with_retry(
             move || {
                 counter_clone.fetch_add(1, Ordering::SeqCst);
-                async move { Err("always fails") }
+                Box::pin(async move { Err("always fails") })
             },
             RetryConfig {
                 max_attempts: 2,

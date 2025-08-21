@@ -53,6 +53,7 @@ toml = "0.8"
 
 # Enhanced testing dependencies
 fastrand = "2.0"
+rand = "0.8"
 unicode-normalization = "0.1"
 base64 = "0.22"
 regex = { workspace = true }

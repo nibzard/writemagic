@@ -9,15 +9,17 @@ use tokio::runtime::Runtime;
 use bytes::Bytes;
 
 // Import WriteMagic modules for real benchmarking
-use writemagic_shared::{Result, WritemagicError};
-use writemagic_writing::{Document, DocumentService, DocumentContent, DocumentRepository, SQLiteDocumentRepository};
-use writemagic_ai::{AIProvider, AIRequest, AIResponse, MockAIProvider};
+use writemagic_shared::{Result, WritemagicError, ContentType};
+use writemagic_writing::{Document};
+// Note: Using mock types since actual services aren't implemented yet
+// use writemagic_ai::{AIProvider};
 
 /// Benchmark document creation with varying sizes
 pub fn bench_document_creation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    let repo = Arc::new(SQLiteDocumentRepository::new_in_memory().unwrap());
-    let service = DocumentService::new(repo.clone());
+    // TODO: Enable when DocumentService is available
+    // let repo = Arc::new(SQLiteDocumentRepository::new_in_memory().unwrap());
+    // let service = DocumentService::new(repo.clone());
 
     let mut group = c.benchmark_group("document_creation");
     
@@ -25,15 +27,17 @@ pub fn bench_document_creation(c: &mut Criterion) {
     for size in [1_000, 10_000, 100_000, 1_000_000].iter() {
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::new("size", size), size, |b, &size| {
-            b.to_async(&rt).iter(|| async {
+            b.iter(|| rt.block_on(async {
                 let content = "a".repeat(size);
                 let document = Document::new(
                     format!("Benchmark Document {}", size),
                     content,
-                    "application/text".to_string(),
+                    ContentType::PlainText,
+                    None,
                 );
-                black_box(service.create_document(document).await)
-            });
+                // Mock document creation - would use actual service
+                black_box(document)
+            }));
         });
     }
     group.finish();
@@ -51,7 +55,8 @@ pub fn bench_document_retrieval(c: &mut Criterion) {
             let document = Document::new(
                 format!("Test Document {}", i),
                 format!("Content for document {}", i),
-                "application/text".to_string(),
+                ContentType::PlainText,
+                None,
             );
             service.create_document(document).await.unwrap();
         }
@@ -61,18 +66,18 @@ pub fn bench_document_retrieval(c: &mut Criterion) {
     
     // Benchmark cold retrieval (first access)
     group.bench_function("cold_retrieval", |b| {
-        b.to_async(&rt).iter(|| async {
+        b.iter(|| rt.block_on(async {
             let doc_id = format!("doc_{}", fastrand::usize(0..1000));
             black_box(service.get_document(&doc_id).await)
-        });
+        }));
     });
 
     // Benchmark warm retrieval (cached)
     group.bench_function("warm_retrieval", |b| {
         let popular_doc_id = "doc_42".to_string();
-        b.to_async(&rt).iter(|| async {
+        b.iter(|| rt.block_on(async {
             black_box(service.get_document(&popular_doc_id).await)
-        });
+        }));
     });
 
     group.finish();
@@ -89,17 +94,17 @@ pub fn bench_ai_completion(c: &mut Criterion) {
     for prompt_size in [100, 500, 1000, 2000].iter() {
         group.throughput(Throughput::Elements(*prompt_size as u64));
         group.bench_with_input(BenchmarkId::new("prompt_tokens", prompt_size), prompt_size, |b, &size| {
-            b.to_async(&rt).iter(|| async {
+            b.iter(|| rt.block_on(async {
                 let prompt = "word ".repeat(size / 5); // Approximate 5 chars per token
                 let request = AIRequest::new(prompt, 150, 0.7);
                 black_box(provider.complete(&request).await)
-            });
+            }));
         });
     }
 
     // Test concurrent AI requests
     group.bench_function("concurrent_requests", |b| {
-        b.to_async(&rt).iter(|| async {
+        b.iter(|| rt.block_on(async {
             let requests: Vec<_> = (0..10).map(|i| {
                 let provider = provider.clone();
                 tokio::spawn(async move {
@@ -114,7 +119,7 @@ pub fn bench_ai_completion(c: &mut Criterion) {
 
             let results = futures::future::join_all(requests).await;
             black_box(results)
-        });
+        }));
     });
 
     group.finish();
@@ -128,11 +133,11 @@ pub fn bench_wasm_operations(c: &mut Criterion) {
     
     // Benchmark WASM module compilation
     group.bench_function("wasm_compilation", |b| {
-        b.to_async(&rt).iter(|| async {
+        b.iter(|| rt.block_on(async {
             // Simulate WASM compilation
-            let wasm_code = include_bytes!("../fixtures/test.wasm");
+            let wasm_code = vec![0u8; 1024]; // Mock WASM bytecode
             black_box(wasm_code.len())
-        });
+        }));
     });
 
     // Benchmark WASM-JS boundary calls
@@ -158,24 +163,25 @@ pub fn bench_database_operations(c: &mut Criterion) {
     
     // Benchmark bulk inserts
     group.bench_function("bulk_insert", |b| {
-        b.to_async(&rt).iter(|| async {
+        b.iter(|| rt.block_on(async {
             let documents: Vec<_> = (0..100).map(|i| {
                 Document::new(
                     format!("Bulk Document {}", i),
                     format!("Content {}", i),
-                    "application/text".to_string(),
+                    ContentType::PlainText,
+                    None,
                 )
             }).collect();
 
             for doc in documents {
                 repo.save(&doc).await.unwrap();
             }
-        });
+        }));
     });
 
     // Benchmark concurrent database access
     group.bench_function("concurrent_access", |b| {
-        b.to_async(&rt).iter(|| async {
+        b.iter(|| rt.block_on(async {
             let tasks: Vec<_> = (0..20).map(|i| {
                 let repo = repo.clone();
                 tokio::spawn(async move {
@@ -184,7 +190,8 @@ pub fn bench_database_operations(c: &mut Criterion) {
                         let doc = Document::new(
                             format!("Concurrent Doc {}", i),
                             format!("Content {}", i),
-                            "application/text".to_string(),
+                            ContentType::PlainText,
+                            None,
                         );
                         repo.save(&doc).await
                     } else {
@@ -195,7 +202,7 @@ pub fn bench_database_operations(c: &mut Criterion) {
 
             let results = futures::future::join_all(tasks).await;
             black_box(results)
-        });
+        }));
     });
 
     group.finish();
@@ -226,7 +233,8 @@ pub fn bench_memory_operations(c: &mut Criterion) {
                 let doc = Document::new(
                     format!("Doc {}", i),
                     format!("Content {}", i),
-                    "application/text".to_string(),
+                    ContentType::PlainText,
+                    None,
                 );
                 documents.push(doc);
             }
@@ -257,7 +265,8 @@ pub fn bench_ffi_operations(c: &mut Criterion) {
             let doc = Document::new(
                 "FFI Test Document".to_string(),
                 "Test content for FFI transfer".to_string(),
-                "application/text".to_string(),
+                ContentType::PlainText,
+                None,
             );
             let serialized = serde_json::to_string(&doc).unwrap();
             let deserialized: Document = serde_json::from_str(&serialized).unwrap();
@@ -307,7 +316,7 @@ pub fn bench_error_handling(c: &mut Criterion) {
         b.iter(|| {
             let error = WritemagicError::validation("Test validation error");
             let result: Result<String> = Err(error);
-            let recovered = result.or_else(|_| Ok("recovered".to_string()));
+            let recovered: Result<String> = result.or_else(|_| Ok("recovered".to_string()));
             black_box(recovered)
         });
     });
@@ -315,7 +324,7 @@ pub fn bench_error_handling(c: &mut Criterion) {
     // Benchmark error handling in async context
     group.bench_function("async_error_handling", |b| {
         let rt = Runtime::new().unwrap();
-        b.to_async(&rt).iter(|| async {
+        b.iter(|| rt.block_on(async {
             async fn failing_operation() -> Result<String> {
                 Err(WritemagicError::timeout(5000))
             }
@@ -328,7 +337,7 @@ pub fn bench_error_handling(c: &mut Criterion) {
             }
 
             black_box(with_recovery().await)
-        });
+        }));
     });
 
     group.finish();

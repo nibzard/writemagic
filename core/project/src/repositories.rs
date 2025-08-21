@@ -289,7 +289,7 @@ pub mod implementations {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::implementations::SqliteProjectRepository;
+    use crate::repositories::implementations::SqliteProjectRepository;
 
     #[tokio::test]
     async fn test_sqlite_repository() {

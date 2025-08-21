@@ -44,21 +44,27 @@ impl Default for ValidationConfig {
 
 /// Comprehensive validation results
 #[derive(Debug, Default)]
-struct ValidationResults {
-    core_engine_tests: TestResults,
-    sqlite_persistence_tests: TestResults,
-    ai_integration_tests: TestResults,
-    memory_safety_tests: TestResults,
-    performance_tests: PerformanceResults,
-    error_handling_tests: TestResults,
-    concurrent_access_tests: TestResults,
+pub struct ValidationResults {
+    pub core_engine_tests: TestResults,
+    pub sqlite_persistence_tests: TestResults,
+    pub ai_integration_tests: TestResults,
+    pub memory_safety_tests: TestResults,
+    pub performance_tests: PerformanceResults,
+    pub error_handling_tests: TestResults,
+    pub concurrent_access_tests: TestResults,
 }
 
 #[derive(Debug, Default)]
-struct TestResults {
-    passed: u32,
-    failed: u32,
-    errors: Vec<String>,
+pub struct TestResults {
+    pub passed: u32,
+    pub failed: u32,
+    pub errors: Vec<String>,
+}
+
+impl TestResults {
+    pub fn is_success(&self) -> bool {
+        self.failed == 0
+    }
 }
 
 #[derive(Debug, Default)]
@@ -81,9 +87,6 @@ impl TestResults {
         self.errors.push(error);
     }
 
-    fn is_success(&self) -> bool {
-        self.failed == 0
-    }
 
     fn summary(&self) -> String {
         format!("Passed: {}, Failed: {}", self.passed, self.failed)

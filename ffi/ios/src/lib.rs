@@ -768,15 +768,7 @@ pub extern "C" fn writemagic_memory_status() -> *mut c_char {
     create_c_string(status.to_string())
 }
 
-/// Free a C string allocated by this library
-#[no_mangle]
-pub extern "C" fn writemagic_free_string(ptr: *mut c_char) {
-    if !ptr.is_null() {
-        unsafe {
-            let _ = CString::from_raw(ptr);
-        }
-    }
-}
+// Note: writemagic_free_string is defined in writemagic_shared::ffi_safety and exported globally
 
 /// Get the library version
 #[no_mangle]

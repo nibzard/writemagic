@@ -2,7 +2,7 @@
 //! 
 //! These tests ensure thread-safe statistics updates under concurrent access
 
-use writemagic_ai::providers::{AtomicUsageStats, ClaudeProvider, OpenAIProvider};
+use crate::providers::{AtomicUsageStats, ClaudeProvider, OpenAIProvider, AIProvider};
 use std::sync::Arc;
 use tokio::task;
 

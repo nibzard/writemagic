@@ -9,9 +9,7 @@
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, Instant};
-use jni::objects::{JString, JValue};
-use jni::JNIEnv;
-use writemagic_android_ffi::*;
+use writemagic_android_ffi;
 
 /// Test framework for FFI boundary validation
 pub struct FFITestFramework {

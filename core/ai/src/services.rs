@@ -764,7 +764,7 @@ impl AIOrchestrationService {
         
         for (provider_name, batch_requests) in provider_batches {
             if let Some(provider) = self.providers.get(&provider_name).cloned() {
-                let circuit_breaker = self.circuit_breakers.get(&provider_name).map(|cb| cb.clone());
+                let _circuit_breaker = self.circuit_breakers.get(&provider_name).map(|cb| cb.clone());
                 
                 let handle = tokio::spawn(async move {
                     // For now, just call the provider directly - circuit breaker implementation needed

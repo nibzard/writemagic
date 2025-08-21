@@ -1,6 +1,6 @@
 //! Basic functionality tests that don't require network calls
 
-use crate::providers::{CompletionRequest, Message, MessageRole, ClaudeProvider, OpenAIProvider, ResponseCache};
+use crate::providers::{CompletionRequest, Message, MessageRole, ClaudeProvider, OpenAIProvider, ResponseCache, AIProvider};
 use crate::services::{ProviderHealth, ContextManagementService, ContentFilteringService, AIProviderRegistry};
 use crate::value_objects::{Prompt, ModelConfiguration};
 

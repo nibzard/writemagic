@@ -200,6 +200,7 @@ pub async fn generate_validation_report() -> Result<ValidationReport> {
 }
 
 fn collect_environment_info() -> TestEnvironment {
+    #[allow(unused_mut)]
     let mut features = Vec::new();
     
     #[cfg(feature = "sqlite")]
@@ -209,6 +210,7 @@ fn collect_environment_info() -> TestEnvironment {
     #[cfg(feature = "mobile")]
     features.push("mobile".to_string());
     
+    #[allow(unused_mut)]
     let mut ai_providers = Vec::new();
     #[cfg(feature = "claude")]
     ai_providers.push("Claude".to_string());
