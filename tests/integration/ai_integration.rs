@@ -4,7 +4,7 @@
 //! provider switching, and response consistency validation.
 
 use anyhow::Result;
-use integration_tests::{TestPlatform, TestResult, TestStatus, test_helpers::*};
+use crate::{TestPlatform, TestResult, TestStatus, test_helpers::*};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

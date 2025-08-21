@@ -134,6 +134,7 @@ impl Model {
 }
 
 /// Document creation helper
+#[allow(dead_code)]
 pub struct DocumentBuilder {
     user_id: String,
     title: String,
@@ -142,6 +143,7 @@ pub struct DocumentBuilder {
     tags: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl DocumentBuilder {
     pub fn new(user_id: String, title: String) -> Self {
         Self {

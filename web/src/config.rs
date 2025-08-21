@@ -61,6 +61,7 @@ impl Config {
         Ok(config)
     }
     
+    #[cfg(test)]
     pub fn test_default() -> Self {
         Self {
             server: ServerConfig {
@@ -130,24 +131,29 @@ impl ServerConfig {
 }
 
 impl DatabaseConfig {
+    #[allow(dead_code)]
     pub fn connection_timeout(&self) -> Duration {
         Duration::from_secs(self.connection_timeout_secs)
     }
     
+    #[allow(dead_code)]
     pub fn idle_timeout(&self) -> Duration {
         Duration::from_secs(self.idle_timeout_secs)
     }
     
+    #[allow(dead_code)]
     pub fn max_lifetime(&self) -> Duration {
         Duration::from_secs(self.max_lifetime_secs)
     }
 }
 
 impl AuthConfig {
+    #[allow(dead_code)]
     pub fn access_token_duration(&self) -> Duration {
         Duration::from_secs(self.access_token_duration_secs as u64)
     }
     
+    #[allow(dead_code)]
     pub fn refresh_token_duration(&self) -> Duration {
         Duration::from_secs(self.refresh_token_duration_secs as u64)
     }

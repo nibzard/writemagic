@@ -8,7 +8,7 @@
 //! - Cross-platform Integration Tests
 
 use anyhow::{Context, Result};
-use integration_tests::{TestPlatform, TestResult, TestStatus, TestSuiteResults};
+use crate::{TestPlatform, TestResult, TestStatus, TestSuiteResults};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::{Command, Stdio};

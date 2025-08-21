@@ -89,6 +89,8 @@ testcontainers = "0.15"
 testcontainers-modules = { version = "0.3", features = ["postgres"] }
 axum-test = "14.0"
 tempfile = "=3.8.1"
+fastrand = "2.0"
+toml = "0.8"
 
 # Advanced performance
 memmap2 = "0.9"

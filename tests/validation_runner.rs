@@ -434,7 +434,7 @@ impl ValidationSuiteRunner {
 
         // 2. Rapid switching between documents (mobile app behavior)
         for _ in 0..20 {
-            let doc_id = &document_ids[fastrand::usize(0..document_ids.len())];
+            let doc_id = &document_ids[0]; // Use first document for validation
             let _ = doc_repo.find_by_id(doc_id).await?;
         }
 

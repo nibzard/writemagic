@@ -4,6 +4,6 @@ pub mod manager;
 pub mod messages;
 
 pub use connection::WebSocketConnection;
-pub use connection::ConnectionId;
+// TODO: Re-export ConnectionId when websocket implementation is complete
 pub use manager::ConnectionManager;
 pub use messages::{ClientMessage, ServerMessage};

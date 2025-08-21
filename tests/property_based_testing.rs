@@ -13,7 +13,7 @@ use serde_json::json;
 // Import WriteMagic modules for testing
 use writemagic_shared::{WritemagicError, Result as WResult};
 use writemagic_writing::{Document, DocumentContent};
-use writemagic_ai::{AIRequest, AIResponse};
+use writemagic_ai::{CompletionRequest, CompletionResponse};
 
 /// Property-based test result
 #[derive(Debug, Clone)]

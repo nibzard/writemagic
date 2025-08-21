@@ -153,7 +153,7 @@ impl PerformanceValidator {
             self.test_memory_stress_performance(&engine).await?;
         }
 
-        let results = self.results.read().await.clone();
+        let results = { self.results.read().await.clone() };
         self.print_performance_summary(&results).await;
 
         Ok(results)
@@ -217,7 +217,7 @@ impl PerformanceValidator {
         println!();
 
         let mut metrics = PerformanceMetrics::default();
-        metrics.calculate_from_times(operation_times);
+        metrics.calculate_from_times(operation_times.clone());
 
         self.results.write().await.document_creation = metrics.clone();
         println!("   ✅ Document Creation - Avg: {:.2}ms, P95: {:.2}ms, Throughput: {:.1} ops/sec",
@@ -267,7 +267,7 @@ impl PerformanceValidator {
         println!();
 
         let mut metrics = PerformanceMetrics::default();
-        metrics.calculate_from_times(operation_times);
+        metrics.calculate_from_times(operation_times.clone());
 
         self.results.write().await.document_retrieval = metrics.clone();
         println!("   ✅ Document Retrieval - Avg: {:.2}ms, P95: {:.2}ms, Throughput: {:.1} ops/sec",
@@ -317,7 +317,7 @@ impl PerformanceValidator {
         println!();
 
         let mut metrics = PerformanceMetrics::default();
-        metrics.calculate_from_times(operation_times);
+        metrics.calculate_from_times(operation_times.clone());
 
         self.results.write().await.document_update = metrics.clone();
         println!("   ✅ Document Update - Avg: {:.2}ms, P95: {:.2}ms, Throughput: {:.1} ops/sec",
@@ -358,7 +358,7 @@ impl PerformanceValidator {
         println!();
 
         let mut metrics = PerformanceMetrics::default();
-        metrics.calculate_from_times(operation_times);
+        metrics.calculate_from_times(operation_times.clone());
 
         self.results.write().await.document_search = metrics.clone();
         println!("   ✅ Document Search - Avg: {:.2}ms, P95: {:.2}ms, Throughput: {:.1} ops/sec",
@@ -417,7 +417,7 @@ impl PerformanceValidator {
         println!();
 
         let mut metrics = PerformanceMetrics::default();
-        metrics.calculate_from_times(operation_times);
+        metrics.calculate_from_times(operation_times.clone());
 
         self.results.write().await.project_operations = metrics.clone();
         println!("   ✅ Project Operations - Avg: {:.2}ms, P95: {:.2}ms, Throughput: {:.1} ops/sec",
@@ -537,7 +537,7 @@ impl PerformanceValidator {
         }
 
         let mut metrics = PerformanceMetrics::default();
-        metrics.calculate_from_times(operation_times);
+        metrics.calculate_from_times(operation_times.clone());
 
         // Estimate memory usage
         metrics.memory_usage_mb = (content_size * iterations) as f64 / (1024.0 * 1024.0);
@@ -594,7 +594,7 @@ impl PerformanceValidator {
         }
 
         let mut metrics = PerformanceMetrics::default();
-        metrics.calculate_from_times(operation_times);
+        metrics.calculate_from_times(operation_times.clone());
 
         self.results.write().await.sqlite_operations = metrics.clone();
         println!("   ✅ SQLite Operations - Avg: {:.2}ms, P95: {:.2}ms, Throughput: {:.1} ops/sec",
@@ -643,7 +643,7 @@ impl PerformanceValidator {
         println!();
 
         let mut metrics = PerformanceMetrics::default();
-        metrics.calculate_from_times(operation_times);
+        metrics.calculate_from_times(operation_times.clone());
 
         self.results.write().await.ai_completion = metrics.clone();
         println!("   ✅ AI Completion - Avg: {:.2}ms, P95: {:.2}ms, Success: {:.1}%",
@@ -712,7 +712,7 @@ impl PerformanceValidator {
         let cleanup_duration = cleanup_start.elapsed().as_secs_f64() * 1000.0;
 
         let mut metrics = PerformanceMetrics::default();
-        metrics.calculate_from_times(operation_times);
+        metrics.calculate_from_times(operation_times.clone());
         
         // Estimate memory usage
         let avg_doc_size = (1024 + 10*1024 + 100*1024 + 512) / 4;

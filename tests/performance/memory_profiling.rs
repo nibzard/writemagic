@@ -1,7 +1,7 @@
 //! Memory profiling utilities
 
 use anyhow::Result;
-use integration_tests::{TestResult, TestStatus, TestPlatform};
+use crate::{TestResult, TestStatus, TestPlatform};
 use std::collections::HashMap;
 
 /// Memory usage statistics

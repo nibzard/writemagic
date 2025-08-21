@@ -106,6 +106,7 @@ impl Model {
 }
 
 /// Project settings structure for type safety
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectSettings {
     pub theme: Option<String>,
@@ -129,6 +130,7 @@ impl Default for ProjectSettings {
     }
 }
 
+#[allow(dead_code)]
 impl ProjectSettings {
     pub fn from_json(json: &Json) -> Result<Self, serde_json::Error> {
         serde_json::from_value(json.clone().into())

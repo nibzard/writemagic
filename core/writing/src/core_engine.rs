@@ -3,10 +3,10 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 #[cfg(not(target_arch = "wasm32"))]
-use writemagic_shared::{DatabaseManager, DatabaseConfig, Result, WritemagicError, EventBus, InMemoryEventBus, CrossDomainServiceRegistry, CrossDomainCoordinator, EntityId};
+use writemagic_shared::{DatabaseManager, DatabaseConfig, Result, WritemagicError};
 
 #[cfg(target_arch = "wasm32")]
-use writemagic_shared::{Result, WritemagicError, EventBus, InMemoryEventBus, CrossDomainServiceRegistry, CrossDomainCoordinator, EntityId};
+use writemagic_shared::{Result, WritemagicError};
 use crate::repositories::{DocumentRepository, ProjectRepository};
 use crate::{InMemoryDocumentRepository, InMemoryProjectRepository};
 #[cfg(feature = "database")]
@@ -28,7 +28,7 @@ use writemagic_ai::{
     ContentFilteringService,
     AIWritingService,
 };
-use writemagic_agent::{TriggerType, ExecutionStrategy};
+// Removed unused agent imports
 
 // Import domain services
 // TODO: Add back when these modules are available

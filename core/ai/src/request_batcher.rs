@@ -35,8 +35,7 @@ struct PendingRequest {
     request: CompletionRequest,
     response_tx: tokio::sync::oneshot::Sender<Result<CompletionResponse>>,
     received_at: Instant,
-    priority: RequestPriority,
-    request_hash: u64,
+    // TODO: Implement priority and hashing when batching logic is complete
 }
 
 /// Batch of requests ready for processing
@@ -54,7 +53,7 @@ struct CacheEntry {
     response: CompletionResponse,
     created_at: Instant,
     ttl: Duration,
-    waiting_requests: Vec<tokio::sync::oneshot::Sender<Result<CompletionResponse>>>,
+    // TODO: Implement request coalescing when caching is complete
 }
 
 /// Advanced request batcher with deduplication and priority queuing
@@ -102,7 +101,6 @@ impl RequestBatcher {
     /// Submit a request for batching
     pub async fn submit_request(&self, request: CompletionRequest) -> Result<CompletionResponse> {
         let request_hash = self.calculate_request_hash(&request);
-        let priority = request.priority.clone();
 
         // Check for deduplication if enabled
         if self.config.enable_deduplication {
@@ -119,8 +117,6 @@ impl RequestBatcher {
             request,
             response_tx,
             received_at: Instant::now(),
-            priority,
-            request_hash,
         };
 
         {
@@ -300,7 +296,6 @@ impl RequestBatcher {
             response,
             created_at: Instant::now(),
             ttl: Duration::from_secs(300), // 5 minutes default TTL
-            waiting_requests: Vec::new(),
         };
 
         let mut cache = self.dedup_cache.write().await;
@@ -415,8 +410,8 @@ impl RequestScheduler {
 /// Simple load balancer for provider selection
 #[derive(Debug)]
 struct LoadBalancer {
-    provider_weights: HashMap<String, f64>,
     provider_stats: HashMap<String, ProviderStats>,
+    // TODO: Implement provider weighting when load balancing is complete
 }
 
 #[derive(Debug, Default)]
@@ -429,7 +424,6 @@ struct ProviderStats {
 impl LoadBalancer {
     fn new() -> Self {
         Self {
-            provider_weights: HashMap::new(),
             provider_stats: HashMap::new(),
         }
     }

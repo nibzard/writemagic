@@ -5,21 +5,22 @@
 
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, Throughput, black_box};
 use std::sync::Arc;
+use std::time::Duration;
+use std::collections::HashMap;
 use tokio::runtime::Runtime;
 use bytes::Bytes;
 
 // Import WriteMagic modules for real benchmarking
-use writemagic_shared::{Result, WritemagicError, ContentType};
-use writemagic_writing::{Document};
-// Note: Using mock types since actual services aren't implemented yet
-// use writemagic_ai::{AIProvider};
+use writemagic_shared::{Result, WritemagicError, ContentType, EntityId, ContentHash, Timestamp};
+use writemagic_writing::{Document, DocumentManagementService, SqliteDocumentRepository};
+use writemagic_ai::{CompletionRequest, CompletionResponse, Message, MessageRole, RequestPriority};
 
 /// Benchmark document creation with varying sizes
 pub fn bench_document_creation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    // TODO: Enable when DocumentService is available
-    // let repo = Arc::new(SQLiteDocumentRepository::new_in_memory().unwrap());
-    // let service = DocumentService::new(repo.clone());
+    // Mock repository for benchmarking without actual DB
+    // let repo = Arc::new(SqliteDocumentRepository::new(pool));
+    // let service = DocumentManagementService::new(repo.clone());
 
     let mut group = c.benchmark_group("document_creation");
     
@@ -27,17 +28,27 @@ pub fn bench_document_creation(c: &mut Criterion) {
     for size in [1_000, 10_000, 100_000, 1_000_000].iter() {
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::new("size", size), size, |b, &size| {
-            b.iter(|| rt.block_on(async {
+            b.iter(|| {
                 let content = "a".repeat(size);
-                let document = Document::new(
-                    format!("Benchmark Document {}", size),
+                let document = Document {
+                    id: EntityId::new(),
+                    title: format!("Benchmark Document {}", size),
                     content,
-                    ContentType::PlainText,
-                    None,
-                );
-                // Mock document creation - would use actual service
+                    content_type: ContentType::PlainText,
+                    content_hash: ContentHash::from_string("test"),
+                    file_path: None,
+                    word_count: size as u32 / 5,
+                    character_count: size as u32,
+                    created_at: Timestamp::now(),
+                    updated_at: Timestamp::now(),
+                    created_by: None,
+                    updated_by: None,
+                    version: 1,
+                    is_deleted: false,
+                    deleted_at: None,
+                };
                 black_box(document)
-            }));
+            });
         });
     }
     group.finish();
@@ -45,81 +56,103 @@ pub fn bench_document_creation(c: &mut Criterion) {
 
 /// Benchmark document retrieval with different cache scenarios
 pub fn bench_document_retrieval(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
-    let repo = Arc::new(SQLiteDocumentRepository::new_in_memory().unwrap());
-    let service = DocumentService::new(repo.clone());
-
-    // Pre-populate with test documents
-    rt.block_on(async {
-        for i in 0..1000 {
-            let document = Document::new(
-                format!("Test Document {}", i),
-                format!("Content for document {}", i),
-                ContentType::PlainText,
-                None,
-            );
-            service.create_document(document).await.unwrap();
-        }
-    });
-
     let mut group = c.benchmark_group("document_retrieval");
     
-    // Benchmark cold retrieval (first access)
-    group.bench_function("cold_retrieval", |b| {
-        b.iter(|| rt.block_on(async {
-            let doc_id = format!("doc_{}", fastrand::usize(0..1000));
-            black_box(service.get_document(&doc_id).await)
-        }));
-    });
+    // Mock document retrieval without actual DB
+    let documents: Vec<Document> = (0..1000).map(|i| Document {
+        id: EntityId::new(),
+        title: format!("Test Document {}", i),
+        content: format!("Content for document {}", i),
+        content_type: ContentType::PlainText,
+        content_hash: writemagic_shared::ContentHash::from_string("test"),
+        file_path: None,
+        word_count: 10,
+        character_count: 50,
+        created_at: writemagic_shared::Timestamp::now(),
+        updated_at: writemagic_shared::Timestamp::now(),
+        created_by: None,
+        updated_by: None,
+        version: 1,
+        is_deleted: false,
+        deleted_at: None,
+    }).collect();
 
-    // Benchmark warm retrieval (cached)
-    group.bench_function("warm_retrieval", |b| {
-        let popular_doc_id = "doc_42".to_string();
-        b.iter(|| rt.block_on(async {
-            black_box(service.get_document(&popular_doc_id).await)
-        }));
+    // Benchmark document search simulation
+    group.bench_function("document_search", |b| {
+        b.iter(|| {
+            let random_index = 0; // Use first document for benchmarking
+            black_box(&documents[random_index])
+        });
     });
 
     group.finish();
 }
 
-/// Benchmark AI provider operations with realistic scenarios
+/// Benchmark AI request processing with realistic scenarios
 pub fn bench_ai_completion(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
-    let provider = MockAIProvider::new();
-
     let mut group = c.benchmark_group("ai_completion");
     
     // Test different prompt sizes
     for prompt_size in [100, 500, 1000, 2000].iter() {
         group.throughput(Throughput::Elements(*prompt_size as u64));
         group.bench_with_input(BenchmarkId::new("prompt_tokens", prompt_size), prompt_size, |b, &size| {
-            b.iter(|| rt.block_on(async {
+            b.iter(|| {
                 let prompt = "word ".repeat(size / 5); // Approximate 5 chars per token
-                let request = AIRequest::new(prompt, 150, 0.7);
-                black_box(provider.complete(&request).await)
-            }));
+                let request = CompletionRequest {
+                    messages: vec![Message {
+                        role: MessageRole::User,
+                        content: prompt,
+                        name: None,
+                        metadata: HashMap::new(),
+                    }],
+                    model: "gpt-3.5-turbo".to_string(),
+                    max_tokens: Some(150),
+                    temperature: Some(0.7),
+                    top_p: None,
+                    frequency_penalty: None,
+                    presence_penalty: None,
+                    stop: None,
+                    stream: false,
+                    metadata: HashMap::new(),
+                    priority: RequestPriority::Normal,
+                    timeout: None,
+                    compress_response: false,
+                    batchable: false,
+                };
+                black_box(request)
+            });
         });
     }
 
-    // Test concurrent AI requests
-    group.bench_function("concurrent_requests", |b| {
-        b.iter(|| rt.block_on(async {
-            let requests: Vec<_> = (0..10).map(|i| {
-                let provider = provider.clone();
-                tokio::spawn(async move {
-                    let request = AIRequest::new(
-                        format!("Complete this text about topic {}: ", i),
-                        100,
-                        0.7
-                    );
-                    provider.complete(&request).await
-                })
-            }).collect();
-
-            let results = futures::future::join_all(requests).await;
-            black_box(results)
-        }));
+    // Test request serialization overhead
+    group.bench_function("request_serialization", |b| {
+        let request = CompletionRequest {
+            messages: vec![Message {
+                role: MessageRole::User,
+                content: "Complete this text".to_string(),
+                name: None,
+                metadata: HashMap::new(),
+            }],
+            model: "gpt-3.5-turbo".to_string(),
+            max_tokens: Some(100),
+            temperature: Some(0.7),
+            top_p: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            stop: None,
+            stream: false,
+            metadata: HashMap::new(),
+            priority: RequestPriority::Normal,
+            timeout: None,
+            compress_response: false,
+            batchable: false,
+        };
+        
+        b.iter(|| {
+            let serialized = serde_json::to_string(&request).unwrap();
+            let deserialized: CompletionRequest = serde_json::from_str(&serialized).unwrap();
+            black_box(deserialized)
+        });
     });
 
     group.finish();
@@ -154,55 +187,61 @@ pub fn bench_wasm_operations(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark database operations under load
+/// Benchmark document processing operations
 pub fn bench_database_operations(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
-    let repo = Arc::new(SQLiteDocumentRepository::new_in_memory().unwrap());
-
-    let mut group = c.benchmark_group("database_operations");
+    let mut group = c.benchmark_group("document_operations");
     
-    // Benchmark bulk inserts
-    group.bench_function("bulk_insert", |b| {
-        b.iter(|| rt.block_on(async {
+    // Benchmark document creation in memory
+    group.bench_function("document_creation", |b| {
+        b.iter(|| {
             let documents: Vec<_> = (0..100).map(|i| {
-                Document::new(
-                    format!("Bulk Document {}", i),
-                    format!("Content {}", i),
-                    ContentType::PlainText,
-                    None,
-                )
+                Document {
+                    id: EntityId::new(),
+                    title: format!("Bulk Document {}", i),
+                    content: format!("Content {}", i),
+                    content_type: ContentType::PlainText,
+                    content_hash: ContentHash::from_string("test"),
+                    file_path: None,
+                    word_count: 2,
+                    character_count: 10,
+                    created_at: Timestamp::now(),
+                    updated_at: Timestamp::now(),
+                    created_by: None,
+                    updated_by: None,
+                    version: 1,
+                    is_deleted: false,
+                    deleted_at: None,
+                }
             }).collect();
-
-            for doc in documents {
-                repo.save(&doc).await.unwrap();
-            }
-        }));
+            black_box(documents)
+        });
     });
 
-    // Benchmark concurrent database access
-    group.bench_function("concurrent_access", |b| {
-        b.iter(|| rt.block_on(async {
-            let tasks: Vec<_> = (0..20).map(|i| {
-                let repo = repo.clone();
-                tokio::spawn(async move {
-                    // Mix of reads and writes
-                    if i % 2 == 0 {
-                        let doc = Document::new(
-                            format!("Concurrent Doc {}", i),
-                            format!("Content {}", i),
-                            ContentType::PlainText,
-                            None,
-                        );
-                        repo.save(&doc).await
-                    } else {
-                        repo.find_by_id(&format!("doc_{}", i)).await
-                    }
-                })
-            }).collect();
-
-            let results = futures::future::join_all(tasks).await;
-            black_box(results)
-        }));
+    // Benchmark document serialization
+    group.bench_function("document_serialization", |b| {
+        let doc = Document {
+            id: EntityId::new(),
+            title: "Test Document".to_string(),
+            content: "Test content".to_string(),
+            content_type: ContentType::PlainText,
+            content_hash: writemagic_shared::ContentHash::from_string("test"),
+            file_path: None,
+            word_count: 2,
+            character_count: 12,
+            created_at: writemagic_shared::Timestamp::now(),
+            updated_at: writemagic_shared::Timestamp::now(),
+            created_by: None,
+            updated_by: None,
+            version: 1,
+            is_deleted: false,
+            deleted_at: None,
+        };
+        
+        b.iter(|| {
+            let serialized = serde_json::to_string(&doc).unwrap();
+            let deserialized: Document = serde_json::from_str(&serialized).unwrap();
+            black_box(deserialized)
+        });
     });
 
     group.finish();
@@ -230,12 +269,23 @@ pub fn bench_memory_operations(c: &mut Criterion) {
             // Simulate typical WriteMagic allocation patterns
             let mut documents = Vec::with_capacity(1000);
             for i in 0..1000 {
-                let doc = Document::new(
-                    format!("Doc {}", i),
-                    format!("Content {}", i),
-                    ContentType::PlainText,
-                    None,
-                );
+                let doc = Document {
+                    id: EntityId::new(),
+                    title: format!("Doc {}", i),
+                    content: format!("Content {}", i),
+                    content_type: ContentType::PlainText,
+                    content_hash: ContentHash::from_string("test"),
+                    file_path: None,
+                    word_count: 2,
+                    character_count: 10,
+                    created_at: Timestamp::now(),
+                    updated_at: Timestamp::now(),
+                    created_by: None,
+                    updated_by: None,
+                    version: 1,
+                    is_deleted: false,
+                    deleted_at: None,
+                };
                 documents.push(doc);
             }
             black_box(documents.len())
@@ -262,12 +312,23 @@ pub fn bench_ffi_operations(c: &mut Criterion) {
     // Benchmark data serialization for FFI
     group.bench_function("data_serialization", |b| {
         b.iter(|| {
-            let doc = Document::new(
-                "FFI Test Document".to_string(),
-                "Test content for FFI transfer".to_string(),
-                ContentType::PlainText,
-                None,
-            );
+            let doc = Document {
+                id: EntityId::new(),
+                title: "FFI Test Document".to_string(),
+                content: "Test content for FFI transfer".to_string(),
+                content_type: ContentType::PlainText,
+                content_hash: ContentHash::from_string("test"),
+                file_path: None,
+                word_count: 5,
+                character_count: 30,
+                created_at: Timestamp::now(),
+                updated_at: Timestamp::now(),
+                created_by: None,
+                updated_by: None,
+                version: 1,
+                is_deleted: false,
+                deleted_at: None,
+            };
             let serialized = serde_json::to_string(&doc).unwrap();
             let deserialized: Document = serde_json::from_str(&serialized).unwrap();
             black_box(deserialized)

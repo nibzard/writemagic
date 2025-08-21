@@ -1,7 +1,7 @@
 //! Data synchronization integration tests
 
 use anyhow::Result;
-use integration_tests::{TestResult, TestStatus, TestPlatform};
+use crate::{TestResult, TestStatus, TestPlatform};
 use std::collections::HashMap;
 
 /// Run data synchronization tests

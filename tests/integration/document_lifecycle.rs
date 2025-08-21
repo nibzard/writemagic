@@ -4,7 +4,7 @@
 //! across Rust core, Android FFI, and Web WASM interfaces.
 
 use anyhow::Result;
-use integration_tests::{TestPlatform, TestResult, TestStatus, test_helpers::*};
+use crate::{TestPlatform, TestResult, TestStatus, test_helpers::*};
 use serde_json::json;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

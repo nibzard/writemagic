@@ -1,7 +1,7 @@
 //! Load testing framework
 
 use anyhow::Result;
-use integration_tests::{TestResult, TestStatus, TestPlatform};
+use crate::{TestResult, TestStatus, TestPlatform};
 use std::collections::HashMap;
 use tokio::time::{Duration, Instant};
 

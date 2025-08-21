@@ -33,6 +33,50 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use writemagic_shared::Result;
 
+/// Test platform enumeration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TestPlatform {
+    Web,
+    Android,
+    IOS,
+    Desktop,
+    WASM,
+}
+
+/// Test result status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TestStatus {
+    Passed,
+    Failed,
+    Skipped,
+    Running,
+}
+
+/// Individual test result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TestResult {
+    pub name: String,
+    pub status: TestStatus,
+    pub platform: TestPlatform,
+    pub duration_ms: f64,
+    pub message: Option<String>,
+}
+
+/// Test helper functions
+pub mod test_helpers {
+    use super::*;
+    
+    pub fn create_test_result(name: &str, status: TestStatus, platform: TestPlatform) -> TestResult {
+        TestResult {
+            name: name.to_string(),
+            status,
+            platform,
+            duration_ms: 0.0,
+            message: None,
+        }
+    }
+}
+
 /// Comprehensive validation report
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ValidationReport {

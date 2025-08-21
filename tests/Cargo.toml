@@ -49,10 +49,10 @@ wiremock = "0.6"
 
 # Add missing dependencies
 futures = { workspace = true }
-toml = "0.8"
+toml = { workspace = true }
 
 # Enhanced testing dependencies
-fastrand = "2.0"
+fastrand = { workspace = true }
 rand = "0.8"
 unicode-normalization = "0.1"
 base64 = "0.22"

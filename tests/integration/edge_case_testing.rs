@@ -4,7 +4,7 @@
 //! error scenarios, and stress testing across all WriteMagic components.
 
 use anyhow::Result;
-use integration_tests::{TestPlatform, TestResult, TestStatus, test_helpers::*};
+use crate::{TestPlatform, TestResult, TestStatus, test_helpers::*};
 use serde_json::json;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
