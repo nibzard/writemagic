@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo build:*)",
+      "Bash(grep:*)",
+      "Bash(cargo tree:*)",
+      "Bash(find:*)",
+      "Bash(cargo clean:*)",
+      "Bash(./gradlew:*)",
+      "Bash(export ANDROID_HOME=/Users/nikola/Library/Android/sdk)",
+      "Bash(mkdir:*)",
+      "Bash(rustup target add:*)",
+      "Bash(export ANDROID_NDK_ROOT=$ANDROID_HOME/ndk-bundle)",
+      "Bash(./scripts/build-android.sh:*)",
+      "Bash(ls:*)",
+      "Bash($ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager:*)",
+      "Bash(chmod:*)",
+      "Bash(./scripts/build-android-native.sh:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

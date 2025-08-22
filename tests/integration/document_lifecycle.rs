@@ -4,7 +4,7 @@
 //! across Rust core, Android FFI, and Web WASM interfaces.
 
 use anyhow::Result;
-use crate::{TestPlatform, TestResult, TestStatus, test_helpers::*};
+use crate::{TestPlatform, TestResult, TestStatus, test_helpers};
 use serde_json::json;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -20,8 +20,8 @@ pub struct DocumentLifecycleTests {
 impl DocumentLifecycleTests {
     /// Create a new document lifecycle test suite
     pub async fn new() -> Result<Self> {
-        let (_temp_file, db_url) = create_test_db().await?;
-        let test_workspace = create_test_workspace()?;
+        let (_temp_file, db_url) = test_helpers::create_test_db().await?;
+        let test_workspace = test_helpers::create_test_workspace()?;
         
         Ok(Self {
             db_url,

@@ -9,13 +9,9 @@
 use std::time::Instant;
 use writemagic_shared::Result;
 
-mod integration_validation;
-mod mobile_ffi_validation;
-mod performance_validation;
-
-use integration_validation::{IntegrationValidator, ValidationConfig as IntegrationConfig};
-use mobile_ffi_validation::{MobileFFIValidator, run_mobile_ffi_validation};
-use performance_validation::{PerformanceValidator, PerformanceConfig, run_performance_validation_suite};
+use crate::integration_validation::{IntegrationValidator, ValidationConfig as IntegrationConfig};
+use crate::mobile_ffi_validation::{MobileFFIValidator, run_mobile_ffi_validation};
+use crate::performance_validation::{PerformanceValidator, PerformanceConfig, run_performance_validation_suite};
 
 /// Validation suite configuration
 #[derive(Debug, Clone)]
@@ -452,7 +448,7 @@ impl ValidationSuiteRunner {
     }
 
     /// Assess performance test results
-    fn assess_performance_results(&self, results: &performance_validation::PerformanceResults) -> bool {
+    fn assess_performance_results(&self, results: &crate::performance_validation::PerformanceResults) -> bool {
         // Define performance thresholds
         let doc_creation_threshold = 200.0; // ms
         let doc_retrieval_threshold = 50.0;  // ms

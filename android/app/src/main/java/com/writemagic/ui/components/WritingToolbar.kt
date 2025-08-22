@@ -165,7 +165,7 @@ fun FloatingWritingToolbar(
                     }
                 )
                 
-                Divider(
+                VerticalDivider(
                     modifier = Modifier
                         .height(32.dp)
                         .width(1.dp)

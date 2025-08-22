@@ -13,18 +13,25 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = WriteMagicPurple80,
-    secondary = WriteMagicPurpleGrey80,
-    tertiary = WriteMagicPink80
+    primary = WriteMagicPrimary80,
+    secondary = WriteMagicSecondary80,
+    tertiary = WriteMagicTertiary80,
+    surface = Color(0xFF121212),
+    onSurface = Color(0xFFE1E1E1),
+    outline = Color(0xFF3F3F3F)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = WriteMagicPurple40,
-    secondary = WriteMagicPurpleGrey40,
-    tertiary = WriteMagicPink40
+    primary = WriteMagicPrimary40,
+    secondary = WriteMagicSecondary40,
+    tertiary = WriteMagicTertiary40,
+    surface = WriteMagicSurface,
+    onSurface = WriteMagicOnSurface,
+    outline = WriteMagicOutline
 )
 
 @Composable

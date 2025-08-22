@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -141,20 +142,13 @@ fun AIScreen() {
                                         else -> ""
                                     }
                                     
-                                    val response = WriteMagicCore.completeText(userMessage, model)
-                                    response?.let { jsonResponse ->
-                                        val aiResponse = Json.decodeFromString<AIResponse>(jsonResponse)
-                                        
-                                        if (aiResponse.success && aiResponse.completion != null) {
-                                            messages = messages + ChatMessage(aiResponse.completion, false)
-                                        } else {
-                                            val errorMsg = aiResponse.error ?: "AI request failed"
-                                            messages = messages + ChatMessage("Sorry, I encountered an error: $errorMsg", false)
-                                            errorMessage = errorMsg
-                                        }
-                                    } ?: run {
-                                        val errorMsg = "Failed to get AI response"
-                                        messages = messages + ChatMessage("Sorry, I'm not available right now. Please try again later.", false)
+                                    val aiResponse = WriteMagicCore.completeText(userMessage, model)
+                                    
+                                    if (aiResponse.success && aiResponse.completion != null) {
+                                        messages = messages + ChatMessage(aiResponse.completion, false)
+                                    } else {
+                                        val errorMsg = aiResponse.error ?: "AI request failed"
+                                        messages = messages + ChatMessage("Sorry, I encountered an error: $errorMsg", false)
                                         errorMessage = errorMsg
                                     }
                                 } catch (e: Exception) {
@@ -221,7 +215,7 @@ fun AIScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                AssistantChip(
+                SuggestionChip(
                     onClick = { 
                         if (!isProcessing) {
                             inputText = "Continue writing from where I left off"
@@ -232,7 +226,7 @@ fun AIScreen() {
                 )
             }
             item {
-                AssistantChip(
+                SuggestionChip(
                     onClick = { 
                         if (!isProcessing) {
                             inputText = "Improve the clarity of this paragraph"
@@ -243,7 +237,7 @@ fun AIScreen() {
                 )
             }
             item {
-                AssistantChip(
+                SuggestionChip(
                     onClick = { 
                         if (!isProcessing) {
                             inputText = "Suggest alternative phrasings"
@@ -254,7 +248,7 @@ fun AIScreen() {
                 )
             }
             item {
-                AssistantChip(
+                SuggestionChip(
                     onClick = { 
                         if (!isProcessing) {
                             inputText = "Help me brainstorm ideas for my writing"

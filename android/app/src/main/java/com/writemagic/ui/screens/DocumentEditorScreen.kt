@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -55,9 +56,8 @@ fun DocumentEditorScreen(
     LaunchedEffect(documentId) {
         if (documentId != "new") {
             try {
-                val result = WriteMagicCore.getDocument(documentId)
-                if (result != null) {
-                    val doc = Json.decodeFromString<Document>(result)
+                val doc = WriteMagicCore.getDocument(documentId)
+                if (doc != null) {
                     document = doc
                     documentTitle = doc.title
                     documentContent = TextFieldValue(doc.content)
@@ -71,9 +71,13 @@ fun DocumentEditorScreen(
             }
         } else {
             isLoading = false
-            LaunchedEffect(Unit) {
-                focusRequester.requestFocus()
-            }
+        }
+    }
+    
+    // Request focus when creating new document
+    LaunchedEffect(documentId) {
+        if (documentId == "new") {
+            focusRequester.requestFocus()
         }
     }
     
@@ -88,13 +92,12 @@ fun DocumentEditorScreen(
                     
                     if (documentId == "new") {
                         // Create new document
-                        val result = WriteMagicCore.createDocument(
+                        val newDoc = WriteMagicCore.createDocument(
                             title = documentTitle.ifBlank { "Untitled Document" },
                             content = documentContent.text,
                             contentType = "markdown"
                         )
-                        if (result != null) {
-                            val newDoc = Json.decodeFromString<Document>(result)
+                        if (newDoc != null) {
                             document = newDoc
                             lastSaved = "Just saved"
                         }
@@ -123,13 +126,12 @@ fun DocumentEditorScreen(
                 isSaving = true
                 
                 if (documentId == "new") {
-                    val result = WriteMagicCore.createDocument(
+                    val newDoc = WriteMagicCore.createDocument(
                         title = documentTitle.ifBlank { "Untitled Document" },
                         content = documentContent.text,
                         contentType = "markdown"
                     )
-                    if (result != null) {
-                        val newDoc = Json.decodeFromString<Document>(result)
+                    if (newDoc != null) {
                         document = newDoc
                         lastSaved = "Saved"
                     }

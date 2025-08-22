@@ -33,49 +33,11 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use writemagic_shared::Result;
 
-/// Test platform enumeration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum TestPlatform {
-    Web,
-    Android,
-    IOS,
-    Desktop,
-    WASM,
-}
+// Re-export consistent types from utils for compatibility
+pub use utils::{TestPlatform, TestStatus, TestResult, TestSuiteResults};
 
-/// Test result status
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum TestStatus {
-    Passed,
-    Failed,
-    Skipped,
-    Running,
-}
-
-/// Individual test result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestResult {
-    pub name: String,
-    pub status: TestStatus,
-    pub platform: TestPlatform,
-    pub duration_ms: f64,
-    pub message: Option<String>,
-}
-
-/// Test helper functions
-pub mod test_helpers {
-    use super::*;
-    
-    pub fn create_test_result(name: &str, status: TestStatus, platform: TestPlatform) -> TestResult {
-        TestResult {
-            name: name.to_string(),
-            status,
-            platform,
-            duration_ms: 0.0,
-            message: None,
-        }
-    }
-}
+// Re-export test helpers from utils
+pub use utils::test_helpers;
 
 /// Comprehensive validation report
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -84,7 +46,7 @@ pub struct ValidationReport {
     pub timestamp: String,
     pub environment: TestEnvironment,
     pub configuration: TestConfiguration,
-    pub results: TestResults,
+    pub results: ValidationTestResults,
     pub performance_metrics: PerformanceMetrics,
     pub recommendations: Vec<String>,
     pub issues: Vec<Issue>,
@@ -112,7 +74,7 @@ pub struct TestConfiguration {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct TestResults {
+pub struct ValidationTestResults {
     pub total_tests: u32,
     pub passed_tests: u32,
     pub failed_tests: u32,

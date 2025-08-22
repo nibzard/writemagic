@@ -3,3 +3,4 @@ pub mod ai_integration;
 pub mod data_synchronization;
 pub mod ffi_integration;
 pub mod wasm_integration;
+pub mod edge_case_testing;

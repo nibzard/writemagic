@@ -3,6 +3,7 @@ package com.writemagic.ui.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -121,8 +122,8 @@ fun TimelineVisualization(
     val primaryColor = MaterialTheme.colorScheme.primary
     val branchColors = mapOf(
         "main" to primaryColor,
-        "characters" to Color.Green,
-        "alternative-ending" to Color.Orange
+        "characters" to Color(0xFF4CAF50), // Green
+        "alternative-ending" to Color(0xFFFF9800) // Orange
     )
     
     Canvas(modifier = modifier) {

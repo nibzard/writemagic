@@ -9,6 +9,7 @@ use std::time::Duration;
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
 use bytes::Bytes;
+use regex::Regex;
 
 // Import WriteMagic modules for real benchmarking
 use writemagic_shared::{Result, WritemagicError, ContentType, EntityId, ContentHash, Timestamp};

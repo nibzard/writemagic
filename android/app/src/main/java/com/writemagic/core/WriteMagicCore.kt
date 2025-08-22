@@ -6,6 +6,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
+import java.util.UUID
+import java.util.Date
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Serializable
 data class Document(
@@ -36,23 +40,87 @@ data class AIResponse(
 
 /**
  * Main interface to the WriteMagic Rust core engine.
- * Handles all FFI calls to the native library.
+ * This version uses a working in-memory implementation while the native library is being built.
  */
 object WriteMagicCore {
     private const val TAG = "WriteMagicCore"
     private var isInitialized = false
+    private val documents = mutableMapOf<String, Document>()
+    private val projects = mutableMapOf<String, String>()
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+    
+    // Simulated AI responses for development
+    private val aiResponses = listOf(
+        "Here's a helpful suggestion based on your input. This response is generated locally while the full AI integration is being built.",
+        "I can help you improve this text. Consider adding more detail to make your point clearer.",
+        "Your writing looks good! You might want to vary your sentence structure for better flow.",
+        "This is an interesting topic. Have you considered exploring it from a different angle?",
+        "The core ideas are solid. Adding specific examples would strengthen your argument."
+    )
     
     init {
-        try {
-            System.loadLibrary("writemagic_android")
-            Log.i(TAG, "Native library loaded successfully")
-        } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "Failed to load native library: ${e.message}")
-        }
+        // Initialize with some sample content
+        createSampleDocument("welcome", "Welcome to WriteMagic", """
+            # Welcome to WriteMagic
+            
+            WriteMagic is an AI-powered writing assistant that helps you create, organize, and improve your content.
+            
+            ## Features
+            - **AI-Powered Writing**: Get intelligent suggestions and completions
+            - **Document Management**: Organize your writing projects
+            - **Modern Interface**: Clean, professional Material 3 design
+            - **Cross-Platform**: Works on Android, iOS, and Web
+            
+            ## Getting Started
+            1. Create a new document from the Documents tab
+            2. Start writing and use AI assistance when needed
+            3. Organize your work into projects
+            4. Export your finished content
+            
+            Happy writing!
+        """.trimIndent())
+        
+        createSampleDocument("guide", "Quick Start Guide", """
+            # Quick Start Guide
+            
+            ## Creating Documents
+            Tap the "+" button to create a new document. Give it a meaningful title and start writing.
+            
+            ## Using AI Features
+            - Select text and tap "AI Assist" for suggestions
+            - Use the AI tab for longer-form content generation
+            - Ask questions about your writing for feedback
+            
+            ## Organization
+            - Group related documents into projects
+            - Use the timeline to track your writing progress
+            - Export documents in various formats when complete
+            
+            ## Tips
+            - Save frequently (auto-save is enabled)
+            - Use markdown for rich formatting
+            - Experiment with different AI prompts for best results
+        """.trimIndent())
+    }
+    
+    private fun createSampleDocument(id: String, title: String, content: String) {
+        val now = dateFormat.format(Date())
+        val doc = Document(
+            id = id,
+            title = title,
+            content = content,
+            contentType = "markdown",
+            wordCount = content.split("\\s+".toRegex()).size,
+            characterCount = content.length,
+            createdAt = now,
+            updatedAt = now,
+            version = 1
+        )
+        documents[id] = doc
     }
     
     /**
-     * Initialize the WriteMagic core engine with AI integration
+     * Initialize the WriteMagic core engine
      */
     suspend fun initialize(claudeKey: String = "", openaiKey: String = ""): Boolean = withContext(Dispatchers.IO) {
         if (isInitialized) {
@@ -60,17 +128,10 @@ object WriteMagicCore {
             return@withContext true
         }
         
-        Log.i(TAG, "Initializing WriteMagic core...")
-        val result = nativeInitialize(claudeKey, openaiKey)
-        isInitialized = result
-        
-        if (result) {
-            Log.i(TAG, "WriteMagic core initialized successfully")
-        } else {
-            Log.e(TAG, "Failed to initialize WriteMagic core")
-        }
-        
-        result
+        Log.i(TAG, "Initializing WriteMagic core (in-memory mode)...")
+        isInitialized = true
+        Log.i(TAG, "WriteMagic core initialized successfully")
+        true
     }
     
     /**
@@ -87,13 +148,22 @@ object WriteMagicCore {
         }
         
         try {
-            val jsonResult = nativeCreateDocument(title, content, contentType)
-            if (jsonResult != null) {
-                Json.decodeFromString<Document>(jsonResult)
-            } else {
-                Log.e(TAG, "Failed to create document")
-                null
-            }
+            val id = UUID.randomUUID().toString()
+            val now = dateFormat.format(Date())
+            val doc = Document(
+                id = id,
+                title = title,
+                content = content,
+                contentType = contentType,
+                wordCount = if (content.isBlank()) 0 else content.split("\\s+".toRegex()).size,
+                characterCount = content.length,
+                createdAt = now,
+                updatedAt = now,
+                version = 1
+            )
+            documents[id] = doc
+            Log.i(TAG, "Created document: $title")
+            doc
         } catch (e: Exception) {
             Log.e(TAG, "Error creating document: ${e.message}")
             null
@@ -109,11 +179,23 @@ object WriteMagicCore {
             return@withContext false
         }
         
-        val result = nativeUpdateDocumentContent(documentId, content)
-        if (!result) {
-            Log.e(TAG, "Failed to update document $documentId")
+        val doc = documents[documentId]
+        if (doc != null) {
+            val now = dateFormat.format(Date())
+            val updatedDoc = doc.copy(
+                content = content,
+                wordCount = if (content.isBlank()) 0 else content.split("\\s+".toRegex()).size,
+                characterCount = content.length,
+                updatedAt = now,
+                version = doc.version + 1
+            )
+            documents[documentId] = updatedDoc
+            Log.i(TAG, "Updated document: $documentId")
+            true
+        } else {
+            Log.w(TAG, "Document not found: $documentId")
+            false
         }
-        result
     }
     
     /**
@@ -125,18 +207,7 @@ object WriteMagicCore {
             return@withContext null
         }
         
-        try {
-            val jsonResult = nativeGetDocument(documentId)
-            if (jsonResult != null) {
-                Json.decodeFromString<Document>(jsonResult)
-            } else {
-                Log.w(TAG, "Document $documentId not found")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting document: ${e.message}")
-            null
-        }
+        documents[documentId]
     }
     
     /**
@@ -148,22 +219,16 @@ object WriteMagicCore {
             return@withContext null
         }
         
-        try {
-            val jsonResult = nativeListDocuments(offset, limit)
-            if (jsonResult != null) {
-                Json.decodeFromString<DocumentList>(jsonResult)
-            } else {
-                Log.e(TAG, "Failed to list documents")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error listing documents: ${e.message}")
-            null
-        }
+        val allDocs = documents.values.toList().sortedByDescending { it.updatedAt }
+        val paginatedDocs = allDocs.drop(offset).take(limit)
+        DocumentList(
+            documents = paginatedDocs,
+            count = allDocs.size
+        )
     }
     
     /**
-     * Complete text using AI with provider fallback
+     * Complete text using AI simulation
      */
     suspend fun completeText(prompt: String, model: String? = null): AIResponse = withContext(Dispatchers.IO) {
         if (!isInitialized) {
@@ -172,15 +237,19 @@ object WriteMagicCore {
         }
         
         try {
-            val jsonResult = nativeCompleteText(prompt, model ?: "")
-            if (jsonResult != null) {
-                Json.decodeFromString<AIResponse>(jsonResult)
-            } else {
-                Log.e(TAG, "AI completion failed")
-                AIResponse(error = "AI completion failed", success = false)
+            // Simulate AI processing time
+            delay(1500)
+            
+            val response = when {
+                prompt.contains("help", ignoreCase = true) -> "I'd be happy to help! Could you provide more details about what you're working on?"
+                prompt.contains("improve", ignoreCase = true) -> "To improve this text, consider adding more specific examples and varying your sentence structure."
+                prompt.contains("write", ignoreCase = true) -> "Here's a suggestion for your writing: Start with a clear topic sentence, then provide supporting details."
+                else -> aiResponses.random()
             }
+            
+            AIResponse(completion = response, success = true)
         } catch (e: Exception) {
-            Log.e(TAG, "Error completing text: ${e.message}")
+            Log.e(TAG, "Error in AI completion: ${e.message}")
             AIResponse(error = e.message ?: "Unknown error", success = false)
         }
     }
@@ -195,14 +264,17 @@ object WriteMagicCore {
         }
         
         try {
-            val jsonResult = nativeCreateProject(name, description)
-            if (jsonResult != null) {
-                Log.i(TAG, "Successfully created project: $name")
-                jsonResult
-            } else {
-                Log.e(TAG, "Failed to create project")
-                null
-            }
+            val id = UUID.randomUUID().toString()
+            val projectData = Json.encodeToString(mapOf(
+                "id" to id,
+                "name" to name,
+                "description" to description,
+                "createdAt" to dateFormat.format(Date()),
+                "documentIds" to emptyList<String>()
+            ))
+            projects[id] = projectData
+            Log.i(TAG, "Created project: $name")
+            projectData
         } catch (e: Exception) {
             Log.e(TAG, "Error creating project: ${e.message}")
             null
@@ -218,27 +290,6 @@ object WriteMagicCore {
             return@withContext null
         }
         
-        try {
-            val jsonResult = nativeGetProject(projectId)
-            if (jsonResult != null) {
-                jsonResult
-            } else {
-                Log.w(TAG, "Project $projectId not found")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting project: ${e.message}")
-            null
-        }
+        projects[projectId]
     }
-    
-    // Native FFI method declarations
-    private external fun nativeInitialize(claudeKey: String, openaiKey: String): Boolean
-    private external fun nativeCreateDocument(title: String, content: String, contentType: String): String?
-    private external fun nativeUpdateDocumentContent(documentId: String, content: String): Boolean
-    private external fun nativeGetDocument(documentId: String): String?
-    private external fun nativeListDocuments(offset: Int, limit: Int): String?
-    private external fun nativeCompleteText(prompt: String, model: String): String?
-    private external fun nativeCreateProject(name: String, description: String): String?
-    private external fun nativeGetProject(projectId: String): String?
 }

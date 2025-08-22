@@ -50,13 +50,13 @@ wiremock = "0.6"
 # Add missing dependencies
 futures = { workspace = true }
 toml = { workspace = true }
+regex = "1.0"
+unicode-normalization = "0.1"
+base64 = "0.22"
 
 # Enhanced testing dependencies
 fastrand = { workspace = true }
 rand = "0.8"
-unicode-normalization = "0.1"
-base64 = "0.22"
-regex = { workspace = true }
 clap = "3.2"
 
 [[bin]]

@@ -19,15 +19,8 @@ import com.writemagic.core.WriteMagicCore
 class MainActivity : ComponentActivity() {
     
     companion object {
-        init {
-            try {
-                // Load native Rust library
-                System.loadLibrary("writemagic_android")
-            } catch (e: UnsatisfiedLinkError) {
-                // Handle gracefully for development
-                println("Native library not found: ${e.message}")
-            }
-        }
+        // Note: Library loading is now handled in WriteMagicCore
+        // to provide better error handling and fallback behavior
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {

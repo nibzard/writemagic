@@ -165,6 +165,10 @@ getrandom = { version = "=0.2.16", features = ["js"] }
 # Force specific dependency versions to ensure getrandom compatibility
 ahash = { version = "=0.8.7" }  # Last version that uses getrandom 0.2
 
+# Testing utilities
+unicode-normalization = "0.1"
+base64 = "0.22"
+
 
 # Use workspace.lints for consistent linting across all crates
 [workspace.lints.rust]

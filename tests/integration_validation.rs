@@ -22,7 +22,7 @@ use writemagic_writing::{
 
 /// Test configuration for validation scenarios
 #[derive(Debug, Clone)]
-struct ValidationConfig {
+pub struct ValidationConfig {
     use_sqlite: bool,
     enable_ai: bool,
     concurrent_operations: usize,

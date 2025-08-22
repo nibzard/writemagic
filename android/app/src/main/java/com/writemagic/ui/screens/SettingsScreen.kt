@@ -64,7 +64,7 @@ fun SettingsScreen() {
                     }
                 )
                 
-                Divider()
+                HorizontalDivider()
                 
                 SettingsItem(
                     title = "Word Count Goal",
@@ -85,7 +85,7 @@ fun SettingsScreen() {
                     onClick = { /* Open provider selection */ }
                 )
                 
-                Divider()
+                HorizontalDivider()
                 
                 SettingsItem(
                     title = "API Configuration",
@@ -94,7 +94,7 @@ fun SettingsScreen() {
                     onClick = { /* Open API settings */ }
                 )
                 
-                Divider()
+                HorizontalDivider()
                 
                 SettingsItem(
                     title = "Usage & Billing",
@@ -120,7 +120,7 @@ fun SettingsScreen() {
                     }
                 )
                 
-                Divider()
+                HorizontalDivider()
                 
                 SettingsItem(
                     title = "Export Data",
@@ -129,7 +129,7 @@ fun SettingsScreen() {
                     onClick = { /* Export data */ }
                 )
                 
-                Divider()
+                HorizontalDivider()
                 
                 SettingsItem(
                     title = "Import Data",
@@ -150,7 +150,7 @@ fun SettingsScreen() {
                     onClick = { /* Open help */ }
                 )
                 
-                Divider()
+                HorizontalDivider()
                 
                 SettingsItem(
                     title = "Send Feedback",
@@ -159,7 +159,7 @@ fun SettingsScreen() {
                     onClick = { /* Open feedback */ }
                 )
                 
-                Divider()
+                HorizontalDivider()
                 
                 SettingsItem(
                     title = "About",

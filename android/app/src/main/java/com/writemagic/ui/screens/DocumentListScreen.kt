@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -202,8 +203,7 @@ private suspend fun loadDocuments(onResult: (List<Document>, String?) -> Unit) {
     try {
         val result = WriteMagicCore.listDocuments(0, 50)
         if (result != null) {
-            val documentList = Json.decodeFromString<com.writemagic.core.DocumentList>(result)
-            onResult(documentList.documents, null)
+            onResult(result.documents, null)
         } else {
             onResult(emptyList(), "Failed to load documents")
         }

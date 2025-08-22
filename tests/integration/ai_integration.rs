@@ -467,7 +467,7 @@ impl AIIntegrationTests {
         match tokio::time::timeout(timeout_duration, async {
             // Simulate a request that takes too long
             tokio::time::sleep(Duration::from_secs(5)).await;
-            Ok(())
+            Ok::<(), anyhow::Error>(())
         }).await {
             Ok(_) => anyhow::bail!("Request should have timed out"),
             Err(_) => Ok(()), // Timeout occurred as expected
