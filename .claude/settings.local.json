@@ -15,7 +15,8 @@
       "Bash(ls:*)",
       "Bash($ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager:*)",
       "Bash(chmod:*)",
-      "Bash(./scripts/build-android-native.sh:*)"
+      "Bash(./scripts/build-android-native.sh:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
